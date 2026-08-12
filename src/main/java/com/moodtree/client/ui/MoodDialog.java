@@ -176,20 +176,18 @@ public class MoodDialog extends Stage {
         return result;
     }
 
-    /** 心情按钮：中性底色（CARD），选中时心情色描边 + 微色底 */
+    /** 心情按钮：中性底色（CARD），选中时微色底，无描边（圆角统一） */
     private static String moodTileStyle(MoodMeta m, boolean selected) {
         String fontFamily = "-fx-font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;";
         if (selected) {
             String bg = Theme.lighten(m.color, 0.75f);
             return "-fx-background-color: " + bg + "; -fx-background-radius: 10;"
                     + "-fx-font-size: 14px; -fx-text-fill: " + Theme.INK + "; -fx-cursor: hand;"
-                    + fontFamily
-                    + "-fx-border-color: " + m.color + "; -fx-border-width: 2; -fx-border-radius: 10;";
+                    + fontFamily;
         }
         return "-fx-background-color: " + Theme.CARD + "; -fx-background-radius: 10;"
                 + "-fx-font-size: 14px; -fx-text-fill: " + Theme.INK + "; -fx-cursor: hand;"
-                + fontFamily
-                + "-fx-border-color: transparent; -fx-border-width: 2; -fx-border-radius: 10;";
+                + fontFamily;
     }
 
     private static String labelForPct(int pct) {

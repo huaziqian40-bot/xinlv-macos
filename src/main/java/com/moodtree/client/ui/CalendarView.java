@@ -78,7 +78,6 @@ public class CalendarView extends BorderPane implements Refreshable {
         add.setMaxWidth(Double.MAX_VALUE);
         add.setOnAction(e -> openMoodDialog(null));
         HBox addRow = new HBox(add);
-        addRow.setAlignment(Pos.CENTER);
         addRow.setPadding(new Insets(4, 0, 8, 0));
 
         VBox header = new VBox(6, top, addRow);
@@ -227,14 +226,6 @@ public class CalendarView extends BorderPane implements Refreshable {
                 }
             });
             grid.add(cell, col, row);
-
-            // 格子淡入动画
-            cell.setOpacity(0);
-            FadeTransition cellFade = new FadeTransition(Duration.millis(200), cell);
-            cellFade.setFromValue(0);
-            cellFade.setToValue(1);
-            cellFade.setDelay(Duration.millis((d - 1) * 15));
-            cellFade.play();
         }
     }
 

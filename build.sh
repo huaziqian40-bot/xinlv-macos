@@ -88,6 +88,8 @@ if ! command -v jpackage &> /dev/null; then
 fi
 
 APP_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout 2>/dev/null || echo "1.0.0")
+# 主 jar 名跟随版本号，避免硬编码导致 jpackage 找不到
+MAIN_JAR="moodtree-client-${APP_VERSION}.jar"
 
 rm -rf target/dist
 
@@ -108,7 +110,7 @@ jpackage \
     --app-version "$APP_VERSION" \
     --vendor "心履" \
     --input target/lib \
-    --main-jar moodtree-client-1.0.8.jar \
+    --main-jar "$MAIN_JAR" \
     --main-class com.moodtree.client.Main \
     --icon "$ICON" \
     --dest target/dist \
