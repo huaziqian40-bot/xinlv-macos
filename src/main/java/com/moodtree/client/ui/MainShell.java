@@ -76,6 +76,7 @@ public class MainShell extends BorderPane {
         addNav("calendar", "心 情 日 历", ICON_CALENDAR);
         addNav("recommend", "今 日 推 荐", ICON_RECOMMEND);
         addNav("chat", "A I 树 洞", ICON_CHAT);
+        addNav("game", "小 西 瓜", ICON_GAME);
         addNav("me", "我 的", ICON_ME);
 
         Region spacer = new Region();
@@ -150,6 +151,8 @@ public class MainShell extends BorderPane {
             "M20,2H4c-1.1,0 -2,0.9 -2,2v18l4,-4h14c1.1,0 2,-0.9 2,-2V4C22,2.9 21.1,2 20,2zM6,9h12v2H6V9zM14,14H6v-2h8V14zM18,8H6V6h12V8z";
     private static final String ICON_ME =
             "M12,12c2.21,0 4,-1.79 4,-4s-1.79,-4 -4,-4 -4,1.79 -4,4 1.79,4 4,4zM12,14c-2.67,0 -8,1.34 -8,4v2h16v-2c0,-2.66 -5.33,-4 -8,-4z";
+    private static final String ICON_GAME =
+            "M20.7,4.1C20,3.6 19.2,3.4 18.4,3.4c-1.2,0 -2.4,0.4 -3.5,1H9.1C6.9,4.4 4.9,5.2 3.4,6.7c-1,1 -1.5,2.3 -1.5,3.7 0,3.3 1.9,8.4 3.6,10.1 0.9,0.9 1.9,0.9 2.6,0.2 1.1,-1.1 2.6,-1.7 3.9,-1.7h0c1.3,0 2.8,0.6 3.9,1.7 0.7,0.7 1.7,0.7 2.6,-0.2 1.7,-1.7 3.6,-6.8 3.6,-10.1 0,-1.4 -0.5,-2.7 -1.5,-3.7zM8.5,11h-2v-2h-2v2h-2v2h2v2h2v-2h2V11zM15,12.75c-0.69,0 -1.25,-0.56 -1.25,-1.25s0.56,-1.25 1.25,-1.25 1.25,0.56 1.25,1.25 -0.56,1.25 -1.25,1.25zM17.5,15.25c-0.69,0 -1.25,-0.56 -1.25,-1.25s0.56,-1.25 1.25,-1.25 1.25,0.56 1.25,1.25 -0.56,1.25 -1.25,1.25zM18,11.25c-0.55,0 -1,-0.45 -1,-1s0.45,-1 1,-1 1,0.45 1,1 -0.45,1 -1,1z";
 
     /** 用 SVG path 生成简笔画图标（描边风格，随主题 INK_SOFT 色，比主文字淡），返回 Node 可作按钮图形 */
     private static javafx.scene.Node navIcon(String pathData) {
@@ -200,12 +203,19 @@ public class MainShell extends BorderPane {
 
     private javafx.scene.Node buildView(String key) {
         return switch (key) {
-            case "calendar" -> new CalendarView(app, () -> show("recommend"));
+            case "calendar" -> new CalendarView(app, mood -> showMoodRecommend(mood));
             case "recommend" -> new RecommendView(app);
             case "chat" -> new ChatView(app);
             case "me" -> new MeView(app);
+            case "game" -> new GameView(app);
             default -> new PlaceholderView(key);
         };
+    }
+
+    /** 记录心情后：切到推荐页并选中对应心情（视图已缓存，直接复用实例） */
+    private void showMoodRecommend(String mood) {
+        show("recommend");
+        if (views.get("recommend") instanceof RecommendView rv) rv.showMood(mood);
     }
 
     /** 进入主界面后的首次同步 */

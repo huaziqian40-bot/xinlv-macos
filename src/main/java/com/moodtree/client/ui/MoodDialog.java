@@ -1,5 +1,6 @@
 /* 记心情弹窗：10 个心情按钮（中性底色，选中时强调色描边）+ 强度无极滑动条 + 备注。
- * 新建和编辑共用（编辑传入已有记录）。保存按钮用强调色，取消按钮无边框。 */
+ * 新建和编辑共用（编辑传入已有记录）。无窗口标题栏（macOS 下更清爽）。
+ * 点击外部或按取消关闭；保存按钮用强调色，取消按钮无边框。 */
 package com.moodtree.client.ui;
 
 import com.moodtree.client.model.MoodEntry;
@@ -7,9 +8,8 @@ import com.moodtree.client.model.MoodMeta;
 import javafx.animation.ScaleTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextArea;
@@ -17,26 +17,38 @@ import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
 import java.time.LocalDate;
 
-public class MoodDialog extends Dialog<MoodEntry> {
+public class MoodDialog extends Stage {
+
+    private MoodEntry result;
 
     public MoodDialog(LocalDate date, MoodEntry editing) {
+        initStyle(StageStyle.UNDECORATED);
+        initModality(javafx.stage.Modality.APPLICATION_MODAL);
         setTitle(editing == null ? "记录心情" : "修改记录");
-        setHeaderText(editing == null
+
+        // ---- 标题行（自定义，无 macOS 原生标题栏）----
+        Label titleLabel = new Label(editing == null
                 ? date.getMonthValue() + "月" + date.getDayOfMonth() + "日，现在感觉怎么样？"
                 : "修改这条心情记录");
-        getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        Button okBtn = (Button) getDialogPane().lookupButton(ButtonType.OK);
-        okBtn.setText("保存");
-        okBtn.setStyle(Theme.primaryBtn());
-        Button cancelBtn = (Button) getDialogPane().lookupButton(ButtonType.CANCEL);
-        cancelBtn.setText("取消");
-        cancelBtn.setStyle(Theme.ghostBtn());
+        titleLabel.setStyle(Theme.h1() + "-fx-font-size: 16px;");
+        Button closeBtn = new Button("✕");
+        closeBtn.setStyle(Theme.ghostBtn() + "-fx-font-size: 14px; -fx-padding: 2 8;");
+        closeBtn.setOnAction(e -> close());
+        Region titleSpacer = new Region();
+        HBox.setHgrow(titleSpacer, javafx.scene.layout.Priority.ALWAYS);
+        HBox titleBar = new HBox(10, titleLabel, titleSpacer, closeBtn);
+        titleBar.setAlignment(Pos.CENTER_LEFT);
+        titleBar.setPadding(new Insets(0, 0, 12, 0));
 
+        // ---- 10 个心情按钮 ----
         ToggleGroup group = new ToggleGroup();
         GridPane grid = new GridPane();
         grid.setHgap(8);
@@ -106,25 +118,30 @@ public class MoodDialog extends Dialog<MoodEntry> {
         note.setWrapText(true);
         note.setStyle(Theme.input());
 
-        VBox body = new VBox(14, grid, intensityRow, noteLabel, note);
-        body.setPadding(new Insets(16));
+        // ---- 按钮行 ----
+        Button saveBtn = new Button("保存");
+        saveBtn.setStyle(Theme.primaryBtn());
+        Button cancelBtn = new Button("取消");
+        cancelBtn.setStyle(Theme.ghostBtn());
+        cancelBtn.setOnAction(e -> close());
+        HBox buttons = new HBox(10, saveBtn, cancelBtn);
+        buttons.setAlignment(Pos.CENTER_RIGHT);
+        buttons.setPadding(new Insets(12, 0, 0, 0));
+
+        VBox body = new VBox(14, titleBar, grid, intensityRow, noteLabel, note, buttons);
+        body.setPadding(new Insets(20));
         body.setAlignment(Pos.CENTER_LEFT);
-        getDialogPane().setContent(body);
-        getDialogPane().setStyle(Theme.page());
+        body.setStyle("-fx-background-color: " + Theme.CARD + ";"
+                + "-fx-background-radius: 16; -fx-border-radius: 16;"
+                + "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 20, 0, 0, 4);");
 
-        // 弹窗缩放淡入动画（与手机端 MoodDialogFragment scale_in 对齐）
-        setOnShowing(d -> {
-            javafx.scene.Node content = getDialogPane().getContent();
-            ScaleTransition st = new ScaleTransition(Duration.millis(250), content);
-            st.setFromX(0.85);
-            st.setFromY(0.85);
-            st.setToX(1.0);
-            st.setToY(1.0);
-            st.play();
-        });
+        Scene scene = new Scene(body);
+        scene.setFill(javafx.scene.paint.Color.TRANSPARENT);
+        setScene(scene);
 
-        setResultConverter(bt -> {
-            if (bt != ButtonType.OK || group.getSelectedToggle() == null) return null;
+        // 保存按钮逻辑
+        saveBtn.setOnAction(e -> {
+            if (group.getSelectedToggle() == null) return;
             String mood = (String) group.getSelectedToggle().getUserData();
             int pct = (int) intensitySlider.getValue();
             int level = levelForPct(pct);
@@ -134,30 +151,54 @@ public class MoodDialog extends Dialog<MoodEntry> {
                 editing.intensityLevel = level;
                 editing.intensityPercent = pct;
                 editing.touchLocal();
-                return editing;
+                result = editing;
+            } else {
+                result = MoodEntry.create(date, mood, note.getText(), level, pct);
             }
-            return MoodEntry.create(date, mood, note.getText(), level, pct);
+            close();
         });
+
+        // 弹窗缩放淡入动画（与手机端 MoodDialogFragment scale_in 对齐）
+        setOnShowing(d -> {
+            ScaleTransition st = new ScaleTransition(Duration.millis(250), body);
+            st.setFromX(0.85);
+            st.setFromY(0.85);
+            st.setToX(1.0);
+            st.setToY(1.0);
+            st.play();
+        });
+
+        // 点击窗口外关闭
+        setOnCloseRequest(e -> result = null);
+    }
+
+    public MoodEntry getResult() {
+        return result;
     }
 
     /** 心情按钮：中性底色（CARD），选中时心情色描边 + 微色底 */
     private static String moodTileStyle(MoodMeta m, boolean selected) {
+        String fontFamily = "-fx-font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;";
         if (selected) {
             String bg = Theme.lighten(m.color, 0.75f);
             return "-fx-background-color: " + bg + "; -fx-background-radius: 10;"
                     + "-fx-font-size: 14px; -fx-text-fill: " + Theme.INK + "; -fx-cursor: hand;"
+                    + fontFamily
                     + "-fx-border-color: " + m.color + "; -fx-border-width: 2; -fx-border-radius: 10;";
         }
         return "-fx-background-color: " + Theme.CARD + "; -fx-background-radius: 10;"
                 + "-fx-font-size: 14px; -fx-text-fill: " + Theme.INK + "; -fx-cursor: hand;"
+                + fontFamily
                 + "-fx-border-color: transparent; -fx-border-width: 2; -fx-border-radius: 10;";
     }
 
     private static String labelForPct(int pct) {
-        if (pct <= 20) return "略微";
-        else if (pct <= 45) return "有点";
-        else if (pct <= 70) return "相当";
-        else return "十分";
+        String label;
+        if (pct <= 20) label = "略微";
+        else if (pct <= 45) label = "有点";
+        else if (pct <= 70) label = "相当";
+        else label = "十分";
+        return label + " · " + pct + "%";
     }
 
     private static int levelForPct(int pct) {

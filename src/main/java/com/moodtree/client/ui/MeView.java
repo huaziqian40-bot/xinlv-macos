@@ -166,7 +166,7 @@ public class MeView extends VBox implements Refreshable {
             for (JsonElement el : p.getAsJsonArray("badges")) {
                 JsonObject b = el.getAsJsonObject();
                 Label emoji = new Label(b.get("emoji").getAsString());
-                emoji.setStyle("-fx-font-size: 28px;");
+                emoji.setStyle("-fx-font-size: 28px; -fx-font-family: 'Apple Color Emoji';");
                 Label name = new Label(b.get("name").getAsString());
                 name.setStyle("-fx-font-size: 13px; -fx-text-fill: " + Theme.INK + ";");
                 Label need = new Label("连续 " + b.get("days").getAsInt() + " 天");
@@ -220,7 +220,7 @@ public class MeView extends VBox implements Refreshable {
         avatarWrap.setMinSize(size, size);
         avatarWrap.setMaxSize(size, size);
 
-        Circle clip = new Circle(size / 2.0);
+        Circle clip = new Circle(size / 2.0, size / 2.0, size / 2.0);
         avatarWrap.setClip(clip);
 
         Region avatarBg = new Region();

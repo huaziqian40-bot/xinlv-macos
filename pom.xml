@@ -9,7 +9,7 @@
 
     <groupId>com.moodtree</groupId>
     <artifactId>moodtree-client</artifactId>
-    <version>1.0.7</version>
+    <version>1.0.8</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -29,6 +29,12 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-media</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <!-- 大西瓜小游戏（WebView 加载本地 HTML） -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-web</artifactId>
             <version>${javafx.version}</version>
         </dependency>
         <!-- JSON 解析（接口请求/响应） -->

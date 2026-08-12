@@ -54,30 +54,28 @@ else
 fi
 
 # ---- 步骤 2：生成 .icns 图标（如果不存在） ----
-echo -e "\n${YELLOW}[2/3] 检查图标...${NC}"
+# 注意：logo.icns 不应提交到 git——每次构建从 logo.png 重新生成，
+# 避免 PNG 换过但 icns 还是旧的（图标不更新）。若想强制重建：rm src/main/resources/logo.icns
+echo -e "\n${YELLOW}[2/3] 生成图标（始终从 logo.png 重建，保证透明通道 & 最新 logo）...${NC}"
 ICON="src/main/resources/logo.icns"
-if [ ! -f "$ICON" ]; then
-    echo "logo.icns 不存在，从 logo.png 生成..."
-    if [ -f "src/main/resources/logo.png" ]; then
-        ICONSET="build/logo.iconset"
-        mkdir -p "$ICONSET"
-        sips -z 16 16 src/main/resources/logo.png --out "$ICONSET/icon_16x16.png" > /dev/null 2>&1
-        sips -z 32 32 src/main/resources/logo.png --out "$ICONSET/icon_16x16@2x.png" > /dev/null 2>&1
-        sips -z 32 32 src/main/resources/logo.png --out "$ICONSET/icon_32x32.png" > /dev/null 2>&1
-        sips -z 64 64 src/main/resources/logo.png --out "$ICONSET/icon_32x32@2x.png" > /dev/null 2>&1
-        sips -z 128 128 src/main/resources/logo.png --out "$ICONSET/icon_128x128.png" > /dev/null 2>&1
-        sips -z 256 256 src/main/resources/logo.png --out "$ICONSET/icon_128x128@2x.png" > /dev/null 2>&1
-        sips -z 256 256 src/main/resources/logo.png --out "$ICONSET/icon_256x256.png" > /dev/null 2>&1
-        sips -z 512 512 src/main/resources/logo.png --out "$ICONSET/icon_256x256@2x.png" > /dev/null 2>&1
-        sips -z 512 512 src/main/resources/logo.png --out "$ICONSET/icon_512x512.png" > /dev/null 2>&1
-        iconutil -c icns "$ICONSET" -o "$ICON"
-        rm -rf "$ICONSET"
-        echo -e "${GREEN}✓ logo.icns 已生成${NC}"
-    else
-        echo -e "${YELLOW}⚠ logo.png 未找到，跳过图标（Dock 将使用默认图标）${NC}"
-    fi
+if [ -f "src/main/resources/logo.png" ]; then
+    ICONSET="build/logo.iconset"
+    rm -rf "$ICONSET"
+    mkdir -p "$ICONSET"
+    sips -z 16 16 src/main/resources/logo.png --out "$ICONSET/icon_16x16.png" > /dev/null 2>&1
+    sips -z 32 32 src/main/resources/logo.png --out "$ICONSET/icon_16x16@2x.png" > /dev/null 2>&1
+    sips -z 32 32 src/main/resources/logo.png --out "$ICONSET/icon_32x32.png" > /dev/null 2>&1
+    sips -z 64 64 src/main/resources/logo.png --out "$ICONSET/icon_32x32@2x.png" > /dev/null 2>&1
+    sips -z 128 128 src/main/resources/logo.png --out "$ICONSET/icon_128x128.png" > /dev/null 2>&1
+    sips -z 256 256 src/main/resources/logo.png --out "$ICONSET/icon_128x128@2x.png" > /dev/null 2>&1
+    sips -z 256 256 src/main/resources/logo.png --out "$ICONSET/icon_256x256.png" > /dev/null 2>&1
+    sips -z 512 512 src/main/resources/logo.png --out "$ICONSET/icon_256x256@2x.png" > /dev/null 2>&1
+    sips -z 512 512 src/main/resources/logo.png --out "$ICONSET/icon_512x512.png" > /dev/null 2>&1
+    iconutil -c icns "$ICONSET" -o "$ICON"
+    rm -rf "$ICONSET"
+    echo -e "${GREEN}✓ logo.icns 已从 logo.png 重建（保留透明通道）${NC}"
 else
-    echo -e "${GREEN}✓ logo.icns 已存在${NC}"
+    echo -e "${YELLOW}⚠ logo.png 未找到，跳过图标（Dock 将使用默认图标）${NC}"
 fi
 
 # ---- 步骤 3：jpackage 打包 DMG ----
@@ -110,7 +108,7 @@ jpackage \
     --app-version "$APP_VERSION" \
     --vendor "心履" \
     --input target/lib \
-    --main-jar moodtree-client-1.0.7.jar \
+    --main-jar moodtree-client-1.0.8.jar \
     --main-class com.moodtree.client.Main \
     --icon "$ICON" \
     --dest target/dist \
@@ -120,7 +118,7 @@ jpackage \
     --java-options "-Xmx512m" \
     --java-options "-Dfile.encoding=UTF-8" \
     --java-options "--module-path=\$APPDIR" \
-    --java-options "--add-modules=javafx.controls,javafx.media"
+    --java-options "--add-modules=javafx.controls,javafx.media,javafx.web"
 
 echo -e "\n${GREEN}✓ 构建完成！${NC}"
 echo -e "DMG 文件：${GREEN}$(ls target/dist/*.dmg)${NC}"

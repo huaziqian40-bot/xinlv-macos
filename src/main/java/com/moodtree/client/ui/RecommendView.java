@@ -108,6 +108,18 @@ public class RecommendView extends VBox implements Refreshable {
         animateIn(scroll, 2);
     }
 
+    /** 外部调用：选中某心情并加载推荐（用于记心情后自动跳转） */
+    public void showMood(String mood) {
+        for (javafx.scene.Node n : moodBar.getChildren()) {
+            if (n instanceof ToggleButton tb && mood.equals(tb.getUserData())) {
+                moodGroup.selectToggle(tb);
+                tb.setSelected(true);
+                select(mood);
+                return;
+            }
+        }
+    }
+
     private void select(String mood) {
         selectedMood = mood;
         stopPlayer();
