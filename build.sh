@@ -101,34 +101,26 @@ mkdir -p "$RESOURCE_DIR"
 # 默认的 CFBundleIdentifier 会从 --module 推导，也可手动指定
 # 注意：不签名时，用户首次启动需右键 → 打开
 
-# 构建只含实际模块的 lib 目录（与 Windows build_simple.bat 策略一致）：
-# 只复制带平台后缀的 javafx jar（-mac.jar），不复制空壳的 javafx-*.jar（无 module-info.class，
-# 被 jlink 当作自动模块后报错 "自动模块不能用于 jlink"）。也只复制应用 jar 和运行时依赖。
-rm -rf target/pkg-lib
-mkdir -p target/pkg-lib
-cp target/moodtree-client-*.jar target/pkg-lib/
-cp target/lib/javafx-*-mac.jar target/pkg-lib/ 2>/dev/null
-cp target/lib/gson-*.jar target/pkg-lib/
-cp target/lib/sqlite-jdbc-*.jar target/pkg-lib/
-cp target/lib/slf4j-*.jar target/pkg-lib/
-cp target/lib/error_prone_annotations-*.jar target/pkg-lib/ 2>/dev/null
+# 将主 jar 复制到 lib 目录，jpackage 的 --input 需要所有 jar 在同一个目录
+cp target/*.jar target/lib/
 
-# 用 --module 模式打包，jpackage 自动裁剪 JVM 运行时为真实依赖模块，
-# 避免捆绑完整 JDK（modules 文件 112MB）。裁剪后 DMG 从 ~115MB 降到 ~60-70MB。
 jpackage \
     --type dmg \
     --name "心履" \
     --app-version "$APP_VERSION" \
     --vendor "心履" \
-    --module-path target/pkg-lib \
-    --module com.moodtree.client/com.moodtree.client.Main \
+    --input target/lib \
+    --main-jar "$MAIN_JAR" \
+    --main-class com.moodtree.client.Main \
     --icon "$ICON" \
     --dest target/dist \
     --mac-package-identifier com.moodtree.app \
     --mac-package-name "心履" \
     --resource-dir "$RESOURCE_DIR" \
     --java-options "-Xmx512m" \
-    --java-options "-Dfile.encoding=UTF-8"
+    --java-options "-Dfile.encoding=UTF-8" \
+    --java-options "--module-path=\$APPDIR" \
+    --java-options "--add-modules=javafx.controls,javafx.media,javafx.web"
 
 echo -e "\n${GREEN}✓ 构建完成！${NC}"
 echo -e "DMG 文件：${GREEN}$(ls target/dist/*.dmg)${NC}"

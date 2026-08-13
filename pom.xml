@@ -70,21 +70,6 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
             </plugin>
-            <!-- 让 jar 成为具名模块（Automatic-Module-Name），jpackage 的 module 模式
-                 才能按真实依赖裁剪运行时（否则按文件名推导出的模块名是 moodtree.client，
-                 与 com.moodtree.client 不匹配，jpackage 直接失败） -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.4.1</version>
-                <configuration>
-                    <archive>
-                        <manifestEntries>
-                            <Automatic-Module-Name>com.moodtree.client</Automatic-Module-Name>
-                        </manifestEntries>
-                    </archive>
-                </configuration>
-            </plugin>
             <!-- 打 jar 时把依赖复制到 target/lib，jpackage 要用 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
