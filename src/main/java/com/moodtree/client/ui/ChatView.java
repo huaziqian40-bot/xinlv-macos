@@ -183,19 +183,16 @@ public class ChatView extends VBox implements Refreshable {
         if ("user".equals(role)) {
             bubble.setStyle("-fx-background-color: " + Theme.ACCENT + "; -fx-text-fill: white;"
                     + "-fx-background-radius: 14 14 4 14; -fx-font-size: 14px;"
-                    + "-fx-font-family: 'Apple Color Emoji';"
                     + "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 6, 0, 0, 1);");
             row.setAlignment(Pos.CENTER_RIGHT);
         } else if (crisis) {
             bubble.setStyle("-fx-background-color: #fdeaea; -fx-text-fill: #8a3b34;"
                     + "-fx-background-radius: 14 14 14 4; -fx-font-size: 14px;"
-                    + "-fx-font-family: 'Apple Color Emoji';"
                     + "-fx-border-color: #c9706a; -fx-border-radius: 14 14 14 4;");
             row.setAlignment(Pos.CENTER_LEFT);
         } else {
             bubble.setStyle("-fx-background-color: " + Theme.CARD + "; -fx-text-fill: " + Theme.INK + ";"
                     + "-fx-background-radius: 14 14 14 4; -fx-font-size: 14px;"
-                    + "-fx-font-family: 'Apple Color Emoji';"
                     + "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 6, 0, 0, 1);");
             row.setAlignment(Pos.CENTER_LEFT);
         }

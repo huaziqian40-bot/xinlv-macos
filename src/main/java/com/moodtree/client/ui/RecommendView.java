@@ -21,6 +21,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -55,12 +56,14 @@ public class RecommendView extends VBox implements Refreshable {
         title.setStyle(Theme.h1());
 
         for (MoodMeta m : MoodMeta.all()) {
-            ToggleButton chip = new ToggleButton(m.emoji + " " + m.label);
+            ToggleButton chip = new ToggleButton();
+            HBox chipContent = new HBox(6, EmojiUtil.emoji(18, m.emoji), new Label(m.label));
+            chipContent.setAlignment(Pos.CENTER);
+            chip.setGraphic(chipContent);
             chip.setUserData(m.key);
             chip.setToggleGroup(moodGroup);
             chip.setStyle("-fx-background-radius: 20;"
-                    + "-fx-padding: 6 14; -fx-font-size: 13px; -fx-cursor: hand;"
-                    + "-fx-font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;");
+                    + "-fx-padding: 6 14; -fx-font-size: 13px; -fx-cursor: hand;");
             // 选中态/未选中态样式（与安卓端一致：浅底浅色、深底深色）
             boolean isDark = Theme.isDarkTheme();
             String color = m.color;
@@ -77,7 +80,6 @@ public class RecommendView extends VBox implements Refreshable {
             chip.selectedProperty().addListener((obs, old, sel) -> {
                 chip.setStyle("-fx-background-radius: 20;"
                         + "-fx-padding: 6 14; -fx-font-size: 13px; -fx-cursor: hand;"
-                        + "-fx-font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;"
                         + "-fx-background-color: " + (sel ? selected : unselected) + ";"
                         + "-fx-text-fill: " + (sel ? color : textColor) + ";");
             });
@@ -85,7 +87,6 @@ public class RecommendView extends VBox implements Refreshable {
             chip.setStyle("-fx-background-color: " + unselected + ";"
                     + "-fx-background-radius: 20;"
                     + "-fx-padding: 6 14; -fx-font-size: 13px; -fx-cursor: hand;"
-                    + "-fx-font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;"
                     + "-fx-text-fill: " + textColor + ";");
             chip.setOnAction(e -> {
                 if (chip.isSelected()) select(m.key);

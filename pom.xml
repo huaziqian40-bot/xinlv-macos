@@ -9,14 +9,14 @@
 
     <groupId>com.moodtree</groupId>
     <artifactId>moodtree-client</artifactId>
-    <version>1.0.9</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>17</maven.compiler.release>
         <!-- JavaFX 与 JDK 17 同代，零兼容风险 -->
-        <javafx.version>17.0.13</javafx.version>
+        <javafx.version>21.0.5</javafx.version>
     </properties>
 
     <dependencies>
@@ -29,6 +29,12 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-media</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <!-- AWT ↔ JavaFX 互转（EmojiUtil 渲染彩色 emoji 用） -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-swing</artifactId>
             <version>${javafx.version}</version>
         </dependency>
         <!-- 大西瓜小游戏（WebView 加载本地 HTML） -->

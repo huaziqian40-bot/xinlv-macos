@@ -16,6 +16,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
@@ -191,8 +192,7 @@ public class CalendarView extends BorderPane implements Refreshable {
             num.setStyle("-fx-font-size: 13px; -fx-text-fill: " + Theme.INK + ";");
 
             MoodMeta m = rep.get(date);
-            Label emoji = new Label(m == null ? "" : m.emoji);
-            emoji.setStyle("-fx-font-size: 22px; -fx-font-family: 'Apple Color Emoji';");
+            ImageView emoji = m == null ? new ImageView() : EmojiUtil.emoji(22, m.emoji);
 
             VBox cell = new VBox(2, num, emoji);
             cell.setAlignment(Pos.TOP_CENTER);
@@ -250,8 +250,7 @@ public class CalendarView extends BorderPane implements Refreshable {
         DateTimeFormatter hm = DateTimeFormatter.ofPattern("HH:mm");
         for (MoodEntry e : entries) {
             MoodMeta m = MoodMeta.of(e.mood);
-            Label emoji = new Label(m.emoji);
-            emoji.setStyle("-fx-font-size: 20px; -fx-font-family: 'Apple Color Emoji';");
+            ImageView emoji = EmojiUtil.emoji(20, m.emoji);
             Label time = new Label(e.at == null ? "" : e.at.format(hm));
             time.setStyle(Theme.soft());
             time.setMinWidth(46);

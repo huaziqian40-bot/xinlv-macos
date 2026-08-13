@@ -15,6 +15,7 @@ import javafx.scene.control.Slider;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
@@ -55,7 +56,10 @@ public class MoodDialog extends Stage {
         grid.setVgap(8);
         int i = 0;
         for (MoodMeta m : MoodMeta.all()) {
-            ToggleButton tile = new ToggleButton(m.emoji + " " + m.label);
+            ToggleButton tile = new ToggleButton();
+            HBox content = new HBox(6, EmojiUtil.emoji(22, m.emoji), new Label(m.label));
+            content.setAlignment(Pos.CENTER);
+            tile.setGraphic(content);
             tile.setUserData(m.key);
             tile.setToggleGroup(group);
             tile.setPrefSize(104, 44);
@@ -178,16 +182,13 @@ public class MoodDialog extends Stage {
 
     /** 心情按钮：中性底色（CARD），选中时微色底，无描边（圆角统一） */
     private static String moodTileStyle(MoodMeta m, boolean selected) {
-        String fontFamily = "-fx-font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;";
         if (selected) {
             String bg = Theme.lighten(m.color, 0.75f);
             return "-fx-background-color: " + bg + "; -fx-background-radius: 10;"
-                    + "-fx-font-size: 14px; -fx-text-fill: " + Theme.INK + "; -fx-cursor: hand;"
-                    + fontFamily;
+                    + "-fx-font-size: 14px; -fx-text-fill: " + Theme.INK + "; -fx-cursor: hand;";
         }
         return "-fx-background-color: " + Theme.CARD + "; -fx-background-radius: 10;"
-                + "-fx-font-size: 14px; -fx-text-fill: " + Theme.INK + "; -fx-cursor: hand;"
-                + fontFamily;
+                + "-fx-font-size: 14px; -fx-text-fill: " + Theme.INK + "; -fx-cursor: hand;";
     }
 
     private static String labelForPct(int pct) {

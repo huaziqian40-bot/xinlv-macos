@@ -18,6 +18,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -95,8 +96,7 @@ public class MeView extends VBox implements Refreshable {
             }
         } catch (Exception ignored) { }
 
-        Label fire = new Label("🔥");
-        fire.setStyle("-fx-font-size: 40px;");
+        ImageView fire = EmojiUtil.emoji(40, "🔥");
         Label days = new Label(streak + " 天");
         days.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: " + Theme.INK + ";");
         Label cap = new Label("连续记录 · 共 " + total + " 条（本机）");
@@ -136,8 +136,7 @@ public class MeView extends VBox implements Refreshable {
 
         // ---- 连胜卡 ----
         int streak = p.has("streak") ? p.get("streak").getAsInt() : 0;
-        Label fire = new Label("🔥");
-        fire.setStyle("-fx-font-size: 40px;");
+        ImageView fire = EmojiUtil.emoji(40, "🔥");
         Label days = new Label(streak + " 天");
         days.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: " + Theme.INK + ";");
         Label cap = new Label("连续记录");
@@ -165,8 +164,7 @@ public class MeView extends VBox implements Refreshable {
         if (p.has("badges")) {
             for (JsonElement el : p.getAsJsonArray("badges")) {
                 JsonObject b = el.getAsJsonObject();
-                Label emoji = new Label(b.get("emoji").getAsString());
-                emoji.setStyle("-fx-font-size: 28px; -fx-font-family: 'Apple Color Emoji';");
+                ImageView emoji = EmojiUtil.emoji(28, b.get("emoji").getAsString());
                 Label name = new Label(b.get("name").getAsString());
                 name.setStyle("-fx-font-size: 13px; -fx-text-fill: " + Theme.INK + ";");
                 Label need = new Label("连续 " + b.get("days").getAsInt() + " 天");
