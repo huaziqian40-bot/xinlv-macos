@@ -104,6 +104,11 @@ mkdir -p "$RESOURCE_DIR"
 # 将主 jar 复制到 lib 目录，jpackage 的 --input 需要所有 jar 在同一个目录
 cp target/*.jar target/lib/
 
+# 注意：下面 --module-path=$APPDIR + --add-modules 会限制运行时解析的 JDK 模块，
+# 少了 java.net.http 会导致 API 请求在运行时 ClassNotFoundException → 客户端一律显示"离线"。
+# 该 bug 在 1.1.0 出现（module-info 之前有 requires java.net.http，--module 模式靠它推导；
+# 切回 --input 模式后只有 add-modules 列表生效，列表里却没有它）。
+
 jpackage \
     --type dmg \
     --name "心履" \
@@ -120,7 +125,7 @@ jpackage \
     --java-options "-Xmx512m" \
     --java-options "-Dfile.encoding=UTF-8" \
     --java-options "--module-path=\$APPDIR" \
-    --java-options "--add-modules=javafx.controls,javafx.media,javafx.web"
+    --java-options "--add-modules=javafx.controls,javafx.media,javafx.web,java.net.http"
 
 echo -e "\n${GREEN}✓ 构建完成！${NC}"
 echo -e "DMG 文件：${GREEN}$(ls target/dist/*.dmg)${NC}"
