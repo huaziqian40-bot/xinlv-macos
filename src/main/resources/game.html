@@ -96,10 +96,24 @@ body{background:#faf8f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
     {r:112,color:'#6fae5c', emoji:'🍉', name:'大西瓜', score:66},
   ];
   const LOSE_LINE = 70;
-  const GRAVITY = 0.45;      // 下落加速度，适度加快运动速度
-  const DAMPING = 0.994;
-  const WALL_BOUNCE = 0.35;
-  const MERGE_BOOST = 1.06;
+  const DEFAULT_GAME_CONFIG = {gravity: 0.45, damping: 0.994, wallBounce: 0.35, mergeBoost: 1.06};
+  let gameConfig = {...DEFAULT_GAME_CONFIG};
+
+  // 在线参数只接受服务端约定的有限范围，异常字段保留本地默认值。
+  function applyGameConfig(raw){
+    raw = raw && typeof raw === 'object' ? raw : {};
+    const numberInRange = (value, low, high, fallback) => {
+      const n = Number(value);
+      return Number.isFinite(n) && n >= low && n <= high ? n : fallback;
+    };
+    gameConfig = {
+      gravity: numberInRange(raw.gravity, 0.05, 1.5, DEFAULT_GAME_CONFIG.gravity),
+      damping: numberInRange(raw.damping, 0.90, 1.0, DEFAULT_GAME_CONFIG.damping),
+      wallBounce: numberInRange(raw.wall_bounce, 0.0, 1.0, DEFAULT_GAME_CONFIG.wallBounce),
+      mergeBoost: numberInRange(raw.merge_boost, 0.5, 2.0, DEFAULT_GAME_CONFIG.mergeBoost)
+    };
+  }
+  window.applyGameConfig = applyGameConfig;
   const SPIN_FRICTION = 0.25;
   const ANG_DAMPING = 0.985;
   const MAX_SPIN = 0.3;
@@ -190,9 +204,9 @@ body{background:#faf8f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
 
   function update(){
     for(const b of balls){
-      b.vy += GRAVITY;
+      b.vy += gameConfig.gravity;
       b.x += b.vx; b.y += b.vy;
-      b.vx *= DAMPING; b.vy *= DAMPING;
+      b.vx *= gameConfig.damping; b.vy *= gameConfig.damping;
       b.angVel *= ANG_DAMPING;
       if(Math.abs(b.vx) + Math.abs(b.vy) < 0.8) b.angVel *= 0.75;
       if(Math.abs(b.angVel) < SPIN_DEAD_ZONE) b.angVel = 0;
@@ -201,10 +215,10 @@ body{background:#faf8f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
       b.angle += b.angVel;
       if(b.scale < 1) b.scale = Math.min(1, b.scale + 0.08);
 
-      if(b.x - b.r < 0){ b.x = b.r; b.vx *= -WALL_BOUNCE; if(Math.abs(b.vy) > 0.5) b.angVel += b.vy / b.r * 0.2; }
-      if(b.x + b.r > W){ b.x = W - b.r; b.vx *= -WALL_BOUNCE; if(Math.abs(b.vy) > 0.5) b.angVel -= b.vy / b.r * 0.2; }
+      if(b.x - b.r < 0){ b.x = b.r; b.vx *= -gameConfig.wallBounce; if(Math.abs(b.vy) > 0.5) b.angVel += b.vy / b.r * 0.2; }
+      if(b.x + b.r > W){ b.x = W - b.r; b.vx *= -gameConfig.wallBounce; if(Math.abs(b.vy) > 0.5) b.angVel -= b.vy / b.r * 0.2; }
       if(b.y + b.r > H){
-        b.y = H - b.r; b.vy *= -WALL_BOUNCE; if(Math.abs(b.vy)<0.6) b.vy=0;
+        b.y = H - b.r; b.vy *= -gameConfig.wallBounce; if(Math.abs(b.vy)<0.6) b.vy=0;
         const rolling = b.vx / b.r;
         b.angVel += (rolling - b.angVel) * 0.15;
       }
@@ -248,7 +262,7 @@ body{background:#faf8f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
       for(const [a,b] of toMerge){
         const level = a.level+1;
         const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-        spawnBall(mx, my, level);
+        spawnBall(mx, my, level, (a.vx + b.vx) / 2, (a.vy + b.vy) / 2 - gameConfig.mergeBoost);
         const nb = balls[balls.length-1];
         nb.scale = 0.7;
         nb.angle = (a.angle + b.angle) / 2;
@@ -346,6 +360,15 @@ body{background:#faf8f5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
     draw();
     requestAnimationFrame(loop);
   }
+
+  function pollGameConfig(){
+    fetch('/api/game-config/', {cache: 'no-store'})
+      .then(response => response.ok ? response.json() : null)
+      .then(config => { if(config) applyGameConfig(config); })
+      .catch(() => {}); // 离线时保持本地默认值/上次有效值
+  }
+  pollGameConfig();
+  window.setInterval(pollGameConfig, 60000);
 
   resetGame();
   loop();

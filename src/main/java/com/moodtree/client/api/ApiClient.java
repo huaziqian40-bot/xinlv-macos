@@ -137,6 +137,11 @@ public class ApiClient {
         return post("/api/v1/sync/push/", entriesJson, true);
     }
 
+    /** 在线小游戏物理参数（免认证）；网络失败抛 ApiException，调用方保留本地默认值。 */
+    public JsonObject gameConfig() throws ApiException {
+        return get("/api/game-config/", null, false);
+    }
+
     /** 全量推荐内容目录（离线缓存用） */
     public JsonObject catalog() throws ApiException {
         return get("/api/v1/catalog/", null, true);

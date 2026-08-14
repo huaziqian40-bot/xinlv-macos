@@ -4,6 +4,8 @@
 package com.moodtree.client.ui;
 
 import com.moodtree.client.AppContext;
+import com.google.gson.JsonObject;
+import javafx.application.Platform;
 import javafx.concurrent.Worker;
 import javafx.geometry.Pos;
 import javafx.scene.layout.VBox;
@@ -16,6 +18,10 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 public class GameView extends VBox implements Refreshable {
 
@@ -23,12 +29,25 @@ public class GameView extends VBox implements Refreshable {
     private final WebView webView = new WebView();
     private final WebEngine engine;
     private static Path tempDir;          // 跨实例共享，避免重复解压
+    private final ScheduledExecutorService configExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "game-config");
+        t.setDaemon(true);
+        return t;
+    });
+    private volatile boolean viewAlive;
 
     public GameView(AppContext app) {
         this.app = app;
         setStyle(Theme.page());
         setAlignment(Pos.CENTER);
         getChildren().add(webView);
+        viewAlive = true;
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (oldScene != null && newScene == null) {
+                viewAlive = false;
+                configExecutor.shutdownNow();
+            }
+        });
 
         // WebView 配置：JS / DOM storage / 无缩放
         engine = webView.getEngine();
@@ -39,8 +58,11 @@ public class GameView extends VBox implements Refreshable {
         engine.getLoadWorker().stateProperty().addListener((obs, old, state) -> {
             if (state == Worker.State.SUCCEEDED) {
                 injectThemeColors();
+                fetchGameConfig();
             }
         });
+
+        configExecutor.scheduleWithFixedDelay(this::fetchGameConfig, 0, 60, TimeUnit.SECONDS);
 
         // 从临时目录加载游戏
         try {
@@ -80,6 +102,20 @@ public class GameView extends VBox implements Refreshable {
         }
     }
 
+    /** 后台拉取在线物理参数，回到 FX 线程注入；失败保持 HTML 默认值。 */
+    private void fetchGameConfig() {
+        if (!viewAlive) return;
+        try {
+            JsonObject config = app.api.gameConfig();
+            String json = config.toString().replace("\\", "\\\\").replace("'", "\\'");
+            Platform.runLater(() -> {
+                if (!viewAlive) return;
+                try { engine.executeScript("window.applyGameConfig && window.applyGameConfig(" + json + ");"); }
+                catch (Exception ignored) { }
+            });
+        } catch (Exception ignored) { }
+    }
+
     /** 向 WebView 注入当前主题色（与安卓端 GameFragment.injectThemeColors 逻辑一致） */
     private void injectThemeColors() {
         String bg = Theme.BG;
@@ -102,6 +138,7 @@ public class GameView extends VBox implements Refreshable {
 
     @Override
     public void refresh() {
+        fetchGameConfig();
         // 切回此页时重新注入主题色（用户可能改了主题）
         Worker.State state = engine.getLoadWorker().getState();
         if (state == Worker.State.SUCCEEDED) {
