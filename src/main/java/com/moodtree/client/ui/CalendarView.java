@@ -78,7 +78,10 @@ public class CalendarView extends BorderPane implements Refreshable {
         add.setStyle(Theme.primaryBtn() + "-fx-font-size: 16px; -fx-padding: 10 28;");
         add.setMaxWidth(Double.MAX_VALUE);
         add.setOnAction(e -> openMoodDialog(null));
+        HBox.setHgrow(add, Priority.ALWAYS);
         HBox addRow = new HBox(add);
+        addRow.setAlignment(Pos.CENTER);
+        addRow.setFillHeight(true);
         addRow.setPadding(new Insets(4, 0, 8, 0));
 
         VBox header = new VBox(6, top, addRow);
@@ -117,9 +120,13 @@ public class CalendarView extends BorderPane implements Refreshable {
 
     @Override
     public void refresh() {
+        refresh(true);
+    }
+
+    private void refresh(boolean animateDetail) {
         monthLabel.setText(month.getYear() + "年" + month.getMonthValue() + "月");
         renderGrid();
-        renderDetail();
+        renderDetail(animateDetail);
     }
 
     /** 取某月全部记录，按日期分组算代表心情 */
@@ -207,8 +214,15 @@ public class CalendarView extends BorderPane implements Refreshable {
                 cell.setOpacity(0.5);
             }
             if (date.equals(today)) border = "-fx-border-color: " + Theme.ACCENT + "; -fx-border-width: 2;";
-            if (date.equals(selected)) bg = "#e9e2d0";
             if (m != null && !isFuture) bg = m.color + "55";   // 心情色做淡底，未来日期不显示心情色
+            // 选中态最后应用，避免被心情色背景覆盖；深浅主题都保持明显对比
+            if (date.equals(selected)) {
+                String selectedColor = m == null ? Theme.ACCENT : m.color;
+                bg = Theme.isDarkTheme()
+                        ? Theme.darken(selectedColor, 0.38f)
+                        : Theme.lighten(selectedColor, 0.18f);
+                border = "-fx-border-color: " + Theme.ACCENT + "; -fx-border-width: 2.5;";
+            }
             cell.setStyle("-fx-background-color: " + bg + "; -fx-background-radius: 10;"
                     + border + "-fx-border-radius: 10; -fx-cursor: " + (isFuture ? "default" : "hand") + ";");
 
@@ -221,7 +235,7 @@ public class CalendarView extends BorderPane implements Refreshable {
                 } else {
                     selected = date;
                     if (clickTimer != null) clickTimer.stop();
-                    clickTimer = new Timeline(new KeyFrame(Duration.millis(230), ev -> refresh()));
+                    clickTimer = new Timeline(new KeyFrame(Duration.millis(230), ev -> refresh(false)));
                     clickTimer.play();
                 }
             });
@@ -229,7 +243,7 @@ public class CalendarView extends BorderPane implements Refreshable {
         }
     }
 
-    private void renderDetail() {
+    private void renderDetail(boolean animate) {
         detailTitle.setText(selected.getMonthValue() + "月" + selected.getDayOfMonth()
                 + "日  " + weekName(selected) + (selected.equals(LocalDate.now()) ? "（今天）" : ""));
         detailList.getChildren().clear();
@@ -285,12 +299,16 @@ public class CalendarView extends BorderPane implements Refreshable {
             detailList.getChildren().add(row);
 
             // 记录行淡入动画
-            row.setOpacity(0);
-            FadeTransition rowFade = new FadeTransition(Duration.millis(250), row);
-            rowFade.setFromValue(0);
-            rowFade.setToValue(1);
-            rowFade.setDelay(Duration.millis(detailList.getChildren().size() * 40));
-            rowFade.play();
+            if (!animate) {
+                row.setOpacity(1);
+            } else {
+                row.setOpacity(0);
+                FadeTransition rowFade = new FadeTransition(Duration.millis(250), row);
+                rowFade.setFromValue(0);
+                rowFade.setToValue(1);
+                rowFade.setDelay(Duration.millis(detailList.getChildren().size() * 40));
+                rowFade.play();
+            }
         }
     }
 

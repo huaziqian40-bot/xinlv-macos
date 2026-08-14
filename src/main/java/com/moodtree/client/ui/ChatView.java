@@ -186,7 +186,9 @@ public class ChatView extends VBox implements Refreshable {
                     + "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 6, 0, 0, 1);");
             row.setAlignment(Pos.CENTER_RIGHT);
         } else if (crisis) {
-            bubble.setStyle("-fx-background-color: #fdeaea; -fx-text-fill: #8a3b34;"
+            String crisisBg = Theme.isDarkTheme() ? "#50302f" : "#fdeaea";
+            String crisisInk = Theme.isDarkTheme() ? "#ffd8d2" : "#8a3b34";
+            bubble.setStyle("-fx-background-color: " + crisisBg + "; -fx-text-fill: " + crisisInk + ";"
                     + "-fx-background-radius: 14 14 14 4; -fx-font-size: 14px;"
                     + "-fx-border-color: #c9706a; -fx-border-radius: 14 14 14 4;");
             row.setAlignment(Pos.CENTER_LEFT);
