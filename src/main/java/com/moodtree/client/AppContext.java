@@ -8,6 +8,7 @@ import com.moodtree.client.sync.SyncEngine;
 import com.moodtree.client.ui.LoginView;
 import com.moodtree.client.ui.MainShell;
 import com.moodtree.client.ui.Theme;
+import com.moodtree.client.ui.ImageLoader;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
@@ -29,6 +30,8 @@ public class AppContext {
         if (cached != null) MoodMeta.overrideFromCatalogJson(cached);
         // 启动时应用保存的主题（预设 + 3 色自定义）
         Theme.apply(config.themeId(), config.themeBg(), config.themeCard(), config.accent());
+        // 预加载全部心情/徽章 PNG 到本地磁盘缓存：首次拉取一次，之后启动秒开
+        ImageLoader.preloadAll(config.dataDir(), config.serverBase());
     }
 
     public boolean loggedIn() { return !config.token().isEmpty(); }
