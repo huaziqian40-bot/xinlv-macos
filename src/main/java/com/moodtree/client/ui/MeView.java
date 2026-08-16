@@ -164,7 +164,9 @@ public class MeView extends VBox implements Refreshable {
         if (p.has("badges")) {
             for (JsonElement el : p.getAsJsonArray("badges")) {
                 JsonObject b = el.getAsJsonObject();
-                ImageView emoji = EmojiUtil.emoji(28, b.get("emoji").getAsString());
+                ImageView emoji = b.has("image") && !b.get("image").isJsonNull()
+                        ? ImageLoader.load(28, app.config.serverBase() + "/static/" + b.get("image").getAsString(), b.get("emoji").getAsString())
+                        : EmojiUtil.emoji(28, b.get("emoji").getAsString());
                 Label name = new Label(b.get("name").getAsString());
                 name.setStyle("-fx-font-size: 13px; -fx-text-fill: " + Theme.INK + ";");
                 Label need = new Label("连续 " + b.get("days").getAsInt() + " 天");

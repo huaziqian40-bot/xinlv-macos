@@ -199,7 +199,8 @@ public class CalendarView extends BorderPane implements Refreshable {
             num.setStyle("-fx-font-size: 13px; -fx-text-fill: " + Theme.INK + ";");
 
             MoodMeta m = rep.get(date);
-            ImageView emoji = m == null ? new ImageView() : EmojiUtil.emoji(22, m.emoji);
+            ImageView emoji = m == null ? new ImageView()
+                    : ImageLoader.load(22, app.config.serverBase() + "/static/" + m.image, m.emoji);
 
             VBox cell = new VBox(2, num, emoji);
             cell.setAlignment(Pos.TOP_CENTER);
@@ -264,7 +265,7 @@ public class CalendarView extends BorderPane implements Refreshable {
         DateTimeFormatter hm = DateTimeFormatter.ofPattern("HH:mm");
         for (MoodEntry e : entries) {
             MoodMeta m = MoodMeta.of(e.mood);
-            ImageView emoji = EmojiUtil.emoji(20, m.emoji);
+            ImageView emoji = ImageLoader.load(20, app.config.serverBase() + "/static/" + m.image, m.emoji);
             Label time = new Label(e.at == null ? "" : e.at.format(hm));
             time.setStyle(Theme.soft());
             time.setMinWidth(46);

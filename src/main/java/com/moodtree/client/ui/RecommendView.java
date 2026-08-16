@@ -57,7 +57,7 @@ public class RecommendView extends VBox implements Refreshable {
 
         for (MoodMeta m : MoodMeta.all()) {
             ToggleButton chip = new ToggleButton();
-            HBox chipContent = new HBox(6, EmojiUtil.emoji(18, m.emoji), new Label(m.label));
+            HBox chipContent = new HBox(6, ImageLoader.load(18, app.config.serverBase() + "/static/" + m.image, m.emoji), new Label(m.label));
             chipContent.setAlignment(Pos.CENTER);
             chip.setGraphic(chipContent);
             chip.setUserData(m.key);

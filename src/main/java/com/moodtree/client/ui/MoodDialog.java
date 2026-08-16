@@ -3,6 +3,7 @@
  * 点击外部或按取消关闭；保存按钮用强调色，取消按钮无边框。 */
 package com.moodtree.client.ui;
 
+import com.moodtree.client.Config;
 import com.moodtree.client.model.MoodEntry;
 import com.moodtree.client.model.MoodMeta;
 import javafx.animation.ScaleTransition;
@@ -57,7 +58,7 @@ public class MoodDialog extends Stage {
         int i = 0;
         for (MoodMeta m : MoodMeta.all()) {
             ToggleButton tile = new ToggleButton();
-            HBox content = new HBox(6, EmojiUtil.emoji(22, m.emoji), new Label(m.label));
+            HBox content = new HBox(6, ImageLoader.load(22, new Config().serverBase() + "/static/" + m.image, m.emoji), new Label(m.label));
             content.setAlignment(Pos.CENTER);
             tile.setGraphic(content);
             tile.setUserData(m.key);
