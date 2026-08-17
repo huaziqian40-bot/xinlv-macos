@@ -43,6 +43,7 @@ public class RecommendView extends VBox implements Refreshable {
     private final Label stateLabel = new Label("选一个心情，给你一些陪伴");
     private final ToggleGroup moodGroup = new ToggleGroup();
     private String selectedMood;
+    private int selectToken;             // 每次点击自增，回调里比对，丢弃过期结果
     private MediaPlayer player;          // 同时只放一首
     private Button playingBtn;
 
@@ -124,20 +125,39 @@ public class RecommendView extends VBox implements Refreshable {
         }
     }
 
+    /** 选中某心情并加载推荐。
+     *  关键约束：无论离线/在线谁先回来，只在 resultBox 还空着时渲染一次——
+     *  谁先到谁画（离线通常更快，带动画），后到的只更新状态文字，绝不重绘。 */
     private void select(String mood) {
         selectedMood = mood;
         stopPlayer();
+        final int token = ++selectToken;
         MoodMeta m = MoodMeta.of(mood);
         stateLabel.setText("正在为你准备「" + m.label + "」的推荐…");
         resultBox.getChildren().clear();
-        Bg.run(() -> {
-                    if (app.api.ping()) {
-                        return app.api.recommend(mood);          // 在线：服务器推荐
-                    }
-                    return offlineRecommend(mood);               // 离线：本地缓存推荐
+
+        // 1. 立即从本地缓存加载（带动画），保证点击即见——这是唯一一次动画
+        Bg.run(() -> offlineRecommend(mood),
+                rec -> {
+                    if (token != selectToken) return;            // 已切到别的情绪，丢弃
+                    if (resultBox.getChildren().isEmpty()) render(rec, true);
                 },
-                this::render,
-                err -> stateLabel.setText("推荐加载失败：" + err.getMessage()));
+                err -> { /* 离线失败没关系，等在线结果 */ });
+
+        // 2. 同时后台请求在线推荐（如果已登录），覆盖更丰富的结果
+        //    离线已渲染过就绝不重绘卡片，只更新状态文字，彻底避免二次动画
+        if (app.loggedIn()) {
+            Bg.run(() -> app.api.recommend(mood),
+                    rec -> {
+                        if (token != selectToken) return;
+                        if (resultBox.getChildren().isEmpty()) {
+                            render(rec, false);
+                        } else {
+                            stateLabel.setText("给「" + MoodMeta.of(mood).label + "」的你");
+                        }
+                    },
+                    err -> { /* 在线失败就保留离线结果 */ });
+        }
     }
 
     /** 离线推荐：从目录缓存按心情筛选后随机挑几条（规则向服务端看齐：歌曲/活动/小知识/视频） */
@@ -196,7 +216,7 @@ public class RecommendView extends VBox implements Refreshable {
         return false;
     }
 
-    private void render(JsonObject rec) {
+    private void render(JsonObject rec, boolean animate) {
         MoodMeta m = MoodMeta.of(rec.get("mood").getAsString());
         boolean offline = rec.has("offline") && rec.get("offline").getAsBoolean();
         resultBox.getChildren().clear();
@@ -240,7 +260,7 @@ public class RecommendView extends VBox implements Refreshable {
                 songCard.getChildren().add(row);
             }
             resultBox.getChildren().add(songCard);
-            animateIn(songCard, delay++);
+            if (animate) animateIn(songCard, delay++);
         }
 
         // ---- 小行动 ----
@@ -253,7 +273,7 @@ public class RecommendView extends VBox implements Refreshable {
                 actCard.getChildren().add(t);
             }
             resultBox.getChildren().add(actCard);
-            animateIn(actCard, delay++);
+            if (animate) animateIn(actCard, delay++);
         }
 
         // ---- 心理小知识 ----
@@ -274,7 +294,7 @@ public class RecommendView extends VBox implements Refreshable {
                 }
             }
             resultBox.getChildren().add(tipCard);
-            animateIn(tipCard, delay++);
+            if (animate) animateIn(tipCard, delay++);
         }
 
         // ---- 视频 ----
