@@ -168,6 +168,13 @@ public class ApiClient {
         return get("/api/v1/chat/history/", null, true);
     }
 
+    /** AI 主动发的消息轮询：{server_time, messages:[{role,content,is_weekly_essay,created_at}]}
+     *  since 传 ISO8601 时间，只返回该时间之后新增的主动消息；null 表示最近 24 小时。 */
+    public JsonObject chatProactive(String since) throws ApiException {
+        return get("/api/v1/chat/proactive/",
+                since == null ? null : Map.of("since", since), true);
+    }
+
     public void chatClear() throws ApiException {
         post("/api/v1/chat/clear/", new JsonObject(), true);
     }

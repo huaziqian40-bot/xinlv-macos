@@ -7,6 +7,8 @@ import com.moodtree.client.AppContext;
 import com.moodtree.client.model.MoodEntry;
 import com.moodtree.client.model.MoodMeta;
 import com.moodtree.client.sync.SyncEngine;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -130,6 +132,59 @@ public class MainShell extends BorderPane {
         Timeline timer = new Timeline(new KeyFrame(Duration.seconds(60), e -> syncNow()));
         timer.setCycleCount(Timeline.INDEFINITE);
         timer.play();
+
+        // ---- AI 主动消息轮询（登录用户，每 60 秒） ----
+        Timeline proactiveTimer = new Timeline(new KeyFrame(Duration.seconds(60), e -> pollProactive()));
+        proactiveTimer.setCycleCount(Timeline.INDEFINITE);
+        proactiveTimer.play();
+    }
+
+    // ============ AI 主动消息轮询 + 系统通知 ============
+
+    private void pollProactive() {
+        if (!app.loggedIn()) return;
+        String since = app.config.lastProactiveCheck();
+        Bg.run(() -> {
+                    if (!app.api.ping()) return null;
+                    return app.api.chatProactive(since.isEmpty() ? null : since);
+                },
+                resp -> {
+                    if (resp == null) return;
+                    String serverTime = "";
+                    if (resp.has("server_time") && !resp.get("server_time").isJsonNull()) {
+                        serverTime = resp.get("server_time").getAsString();
+                    }
+                    if (resp.has("messages") && resp.get("messages").isJsonArray()) {
+                        for (JsonElement el : resp.getAsJsonArray("messages")) {
+                            JsonObject m = el.getAsJsonObject();
+                            String content = m.has("content") ? m.get("content").getAsString() : "";
+                            if (content.isEmpty()) continue;
+                            if (currentKey != null && currentKey.equals("chat")
+                                    && views.get("chat") instanceof ChatView cv) {
+                                cv.addProactiveMessage(content);
+                            } else {
+                                showProactiveNotification(content);
+                            }
+                        }
+                    }
+                    if (!serverTime.isEmpty()) {
+                        app.config.setLastProactiveCheck(serverTime);
+                        app.config.save();
+                    }
+                },
+                err -> { /* 静默 */ });
+    }
+
+    /** 系统托盘通知（类似微信消息提醒） */
+    private void showProactiveNotification(String text) {
+        try {
+            if (!java.awt.SystemTray.isSupported()) return;
+            java.awt.SystemTray tray = java.awt.SystemTray.getSystemTray();
+            java.awt.TrayIcon[] icons = tray.getTrayIcons();
+            if (icons.length == 0) return;
+            String body = text.length() > 120 ? text.substring(0, 120) + "…" : text;
+            icons[0].displayMessage("🌳 树洞来信", body, java.awt.TrayIcon.MessageType.INFO);
+        } catch (Exception e) { /* 静默 */ }
     }
 
     private void addNav(String key, String text, String icon) {

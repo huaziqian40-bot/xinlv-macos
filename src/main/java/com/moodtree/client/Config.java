@@ -87,6 +87,12 @@ public class Config {
     public Path dataDir() { return dir; }
     public Path dbPath() { return dir.resolve("moodtree.db"); }
 
+    /** AI 主动消息轮询游标：上次拉取到的 server_time（ISO8601），空串 = 尚未轮询过 */
+    public String lastProactiveCheck() { return props.getProperty("lastProactiveCheck", ""); }
+    public void setLastProactiveCheck(String v) {
+        props.setProperty("lastProactiveCheck", v == null ? "" : v);
+    }
+
     public void save() {
         try (OutputStream out = Files.newOutputStream(file)) {
             props.store(out, "moodtree client config");

@@ -172,6 +172,11 @@ public class ChatView extends VBox implements Refreshable {
                 });
     }
 
+    /** 主动消息到达时从外部追加一条（与普通气泡完全一致），供 MainShell 轮询调用。 */
+    public void addProactiveMessage(String text) {
+        addBubble("assistant", text, false);
+    }
+
     /** 加一条气泡。crisis=true 时用醒目的暖色求助卡。 */
     private Label addBubble(String role, String text, boolean crisis) {
         Label bubble = new Label(text);
