@@ -43,6 +43,7 @@ public class MainShell extends BorderPane {
     private final Label syncStatus = new Label("尚未同步");
     private String currentKey;
     private boolean syncing;
+    private java.awt.TrayIcon trayIcon;
 
     // ---- 情绪视觉影响 ----
     private final Pane moodOverlay = new Pane();
@@ -127,6 +128,7 @@ public class MainShell extends BorderPane {
         contentWrapper.getChildren().add(rainContainer);  // 叠在最上层
 
         setCenter(contentWrapper);
+        setupSystemTray();
 
         // 登录用户每分钟自动同步一次（失败静默）
         Timeline timer = new Timeline(new KeyFrame(Duration.seconds(60), e -> syncNow()));
@@ -134,6 +136,7 @@ public class MainShell extends BorderPane {
         timer.play();
 
         // ---- AI 主动消息轮询（登录用户，每 60 秒） ----
+        if (app.loggedIn()) pollProactive();
         Timeline proactiveTimer = new Timeline(new KeyFrame(Duration.seconds(60), e -> pollProactive()));
         proactiveTimer.setCycleCount(Timeline.INDEFINITE);
         proactiveTimer.play();
@@ -175,16 +178,24 @@ public class MainShell extends BorderPane {
                 err -> { /* 静默 */ });
     }
 
+    private void setupSystemTray() {
+        try {
+            if (!java.awt.SystemTray.isSupported()) return;
+            java.awt.Image image = new java.awt.image.BufferedImage(16, 16,
+                    java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            trayIcon = new java.awt.TrayIcon(image, "心履");
+            trayIcon.setImageAutoSize(true);
+            java.awt.SystemTray.getSystemTray().add(trayIcon);
+        } catch (Exception ignored) { trayIcon = null; }
+    }
+
     /** 系统托盘通知（类似微信消息提醒） */
     private void showProactiveNotification(String text) {
         try {
-            if (!java.awt.SystemTray.isSupported()) return;
-            java.awt.SystemTray tray = java.awt.SystemTray.getSystemTray();
-            java.awt.TrayIcon[] icons = tray.getTrayIcons();
-            if (icons.length == 0) return;
+            if (trayIcon == null) return;
             String body = text.length() > 120 ? text.substring(0, 120) + "…" : text;
-            icons[0].displayMessage("🌳 树洞来信", body, java.awt.TrayIcon.MessageType.INFO);
-        } catch (Exception e) { /* 静默 */ }
+            trayIcon.displayMessage("🌳 树洞来信", body, java.awt.TrayIcon.MessageType.INFO);
+        } catch (Exception ignored) { }
     }
 
     private void addNav(String key, String text, String icon) {
