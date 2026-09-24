@@ -7,6 +7,7 @@ import com.moodtree.client.model.MoodMeta;
 import com.moodtree.client.sync.SyncEngine;
 import com.moodtree.client.ui.LoginView;
 import com.moodtree.client.ui.MainShell;
+import com.moodtree.client.ui.PhixSessionView;
 import com.moodtree.client.ui.Theme;
 import com.moodtree.client.ui.ImageLoader;
 import javafx.scene.Scene;
@@ -38,6 +39,15 @@ public class AppContext {
 
     /** 可以直接进主界面：已登录，或用户选了游客模式 */
     public boolean canEnterMain() { return loggedIn() || config.guestMode(); }
+
+    /** 首启引导是否已完成 */
+    public boolean phixSessionDone() { return config.phixSessionDone(); }
+
+    /** 显示 phix 首启引导页（§7） */
+    public void showPhixSession() {
+        stage.setScene(new Scene(new PhixSessionView(this), 480, 560));
+        stage.centerOnScreen();
+    }
 
     public void showLogin() {
         stage.setScene(new Scene(new LoginView(this), 480, 560));

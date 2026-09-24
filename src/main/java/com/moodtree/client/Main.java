@@ -40,7 +40,10 @@ public class Main extends Application {
         stage.setMinHeight(620);
         stage.setOnHidden(e -> app.close());
 
-        if (app.canEnterMain()) {
+        if (!app.phixSessionDone()) {
+            // 首启引导（CONTRACT §7）：先问 phix 凭据，完成后才进正常流程
+            app.showPhixSession();
+        } else if (app.canEnterMain()) {
             app.showMain();
         } else {
             app.showLogin();

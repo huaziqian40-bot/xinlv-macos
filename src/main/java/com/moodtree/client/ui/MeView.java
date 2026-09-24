@@ -66,15 +66,35 @@ public class MeView extends VBox implements Refreshable {
             return;
         }
         Bg.run(() -> {
+                    // 先拉 profile（连胜/徽章），再拉 profile.pub（头像明文）
+                    JsonObject p = null;
+                    String avatarBase64 = null;
                     if (app.api.ping()) {
-                        JsonObject p = app.api.profile();
+                        p = app.api.profile();
                         app.db.kvSet("profile_cache", p.toString());
-                        return p;
+                        // 拉 profile.pub 获取明文头像
+                        try {
+                            String srv = app.config.serverBase();
+                            String tok = app.config.token();
+                            JsonObject pub = app.api.getProfilePub(srv, tok);
+                            if (pub != null && pub.has("payload") && pub.get("payload").isJsonObject()) {
+                                JsonObject payload = pub.getAsJsonObject("payload");
+                                if (payload.has("avatar") && !payload.get("avatar").isJsonNull()) {
+                                    avatarBase64 = payload.get("avatar").getAsString();
+                                }
+                            }
+                        } catch (Exception ignored) { }
+                    } else {
+                        String cached = app.db.kvGet("profile_cache");
+                        p = cached == null ? null : JsonParser.parseString(cached).getAsJsonObject();
                     }
-                    String cached = app.db.kvGet("profile_cache");
-                    return cached == null ? null : JsonParser.parseString(cached).getAsJsonObject();
+                    return new Object[]{p, avatarBase64};
                 },
-                this::render,
+                result -> {
+                    JsonObject p = (JsonObject) result[0];
+                    String avatarBase64 = (String) result[1];
+                    render(p, avatarBase64);
+                },
                 err -> stateLabel.setText("加载失败：" + err.getMessage()));
     }
 
@@ -121,7 +141,9 @@ public class MeView extends VBox implements Refreshable {
         animateIn(guestCard, 1);
     }
 
-    private void render(JsonObject p) {
+    private void render(JsonObject p) { render(p, null); }
+
+    private void render(JsonObject p, String avatarBase64) {
         profileBox.getChildren().clear();
         if (p == null) {
             stateLabel.setText("离线且暂无缓存数据，联网后这里会显示你的连胜和徽章");
@@ -130,7 +152,7 @@ public class MeView extends VBox implements Refreshable {
         stateLabel.setText("");
 
         // ---- 头像 + 用户名卡片 ----
-        javafx.scene.Node header = buildProfileHeader(p);
+        javafx.scene.Node header = buildProfileHeader(p, avatarBase64);
         profileBox.getChildren().add(header);
         animateIn(header, 0);
 
@@ -205,13 +227,11 @@ public class MeView extends VBox implements Refreshable {
         tt.play();
     }
 
-    /** 头像 + 用户名卡片：头像从 profile.avatar_url 加载，无头像时显示用户名首字圆形底 */
-    private VBox buildProfileHeader(JsonObject p) {
+    /** 头像 + 用户名卡片：头像从 profile.pub.avatar(base64) 加载，无头像时显示用户名首字圆形底 */
+    private VBox buildProfileHeader(JsonObject p, String avatarBase64) {
         String username = p.has("username") ? p.get("username").getAsString() : "用户";
         String bio = p.has("bio") && !p.get("bio").isJsonNull()
                 ? p.get("bio").getAsString() : "";
-        String avatarUrl = p.has("avatar_url") && !p.get("avatar_url").isJsonNull()
-                ? p.get("avatar_url").getAsString() : "";
 
         // 头像：圆形裁剪
         int size = 56;
@@ -228,27 +248,24 @@ public class MeView extends VBox implements Refreshable {
         avatarBg.setPrefSize(size, size);
         avatarWrap.getChildren().add(avatarBg);
 
-        if (avatarUrl != null && !avatarUrl.isEmpty()) {
-            // 后台加载头像，避免阻塞 UI
-            Bg.run(() -> {
-                        try {
-                            return new Image(avatarUrl, size, size, true, true, true);
-                        } catch (Exception e) {
-                            return null;
-                        }
-                    },
-                    img -> {
-                        if (img != null && !img.isError()) {
-                            ImageView iv = new ImageView(img);
-                            iv.setFitWidth(size);
-                            iv.setFitHeight(size);
-                            iv.setPreserveRatio(true);
-                            avatarWrap.getChildren().add(iv);
-                        } else {
-                            avatarWrap.getChildren().add(initialAvatar(username, size));
-                        }
-                    },
-                    err -> avatarWrap.getChildren().add(initialAvatar(username, size)));
+        // 优先从 profile.pub 的 base64 头像加载
+        if (avatarBase64 != null && !avatarBase64.isEmpty()) {
+            try {
+                String dataUrl = avatarBase64.startsWith("data:") ? avatarBase64
+                        : "data:image/png;base64," + avatarBase64;
+                Image img = new Image(dataUrl, size, size, true, true, true);
+                if (!img.isError()) {
+                    ImageView iv = new ImageView(img);
+                    iv.setFitWidth(size);
+                    iv.setFitHeight(size);
+                    iv.setPreserveRatio(true);
+                    avatarWrap.getChildren().add(iv);
+                } else {
+                    avatarWrap.getChildren().add(initialAvatar(username, size));
+                }
+            } catch (Exception e) {
+                avatarWrap.getChildren().add(initialAvatar(username, size));
+            }
         } else {
             avatarWrap.getChildren().add(initialAvatar(username, size));
         }
@@ -265,11 +282,19 @@ public class MeView extends VBox implements Refreshable {
             col.getChildren().add(bioLabel);
         }
 
+        // 更换头像按钮
+        Button changeAvatarBtn = new Button("更换头像");
+        changeAvatarBtn.setStyle(Theme.ghostBtn() + "-fx-font-size: 12px;");
+        changeAvatarBtn.setOnAction(e -> pickAndUploadAvatar());
+
         HBox card = new HBox(16, avatarWrap, col);
         card.setAlignment(Pos.CENTER_LEFT);
         card.setPadding(new Insets(20));
         card.setStyle(Theme.card());
-        return new VBox(card);
+
+        VBox wrapper = new VBox(6, card, changeAvatarBtn);
+        VBox.setMargin(changeAvatarBtn, new Insets(0, 0, 0, 20));
+        return wrapper;
     }
 
     /** 无头像时：用户名首字 + 强调色圆形底 */
@@ -521,5 +546,69 @@ public class MeView extends VBox implements Refreshable {
     private static String blendTransparent() {
         // 半透明黑（加号底）
         return "rgba(0,0,0,0.04)";
+    }
+
+    // ---- 头像上传（§4 profile.pub，免解密封装） ----
+
+    /** 打开文件选择器，选图后上传到 profile.pub */
+    private void pickAndUploadAvatar() {
+        javafx.stage.FileChooser fc = new javafx.stage.FileChooser();
+        fc.setTitle("选择头像图片");
+        fc.getExtensionFilters().addAll(
+                new javafx.stage.FileChooser.ExtensionFilter("图片文件", "*.png", "*.jpg", "*.jpeg", "*.webp"));
+        java.io.File file = fc.showOpenDialog(getScene().getWindow());
+        if (file == null) return;
+
+        // 检查文件大小 ≤200KB
+        if (file.length() > 200 * 1024) {
+            stateLabel.setText("图片过大（" + (file.length() / 1024) + "KB），请选 200KB 以内的图片");
+            return;
+        }
+
+        stateLabel.setText("正在上传头像…");
+        Bg.run(() -> {
+                    // 读取并 base64 编码
+                    byte[] bytes = java.nio.file.Files.readAllBytes(file.toPath());
+                    String b64 = java.util.Base64.getEncoder().encodeToString(bytes);
+                    String dataUrl = "data:image/" + getExt(file.getName()) + ";base64," + b64;
+
+                    // 构造 profile.pub payload
+                    JsonObject payload = new JsonObject();
+                    payload.addProperty("display_name", app.config.username());
+                    payload.addProperty("avatar", dataUrl);
+                    payload.addProperty("updated_at", java.time.Instant.now().toString());
+
+                    // 获取当前 revision（先读一次）
+                    int rev = 0;
+                    try {
+                        String srv = app.config.serverBase();
+                        String tok = app.config.token();
+                        JsonObject existing = app.api.getProfilePub(srv, tok);
+                        if (existing != null && existing.has("revision")) {
+                            rev = existing.get("revision").getAsInt();
+                        }
+                    } catch (Exception ignored) { }
+
+                    // 上传
+                    String srv = app.config.serverBase();
+                    String tok = app.config.token();
+                    app.api.postProfilePub(srv, tok, payload, rev);
+                    return dataUrl;
+                },
+                dataUrl -> {
+                    stateLabel.setText("头像已更新");
+                    loaded = false;   // 强制刷新
+                    refresh();
+                },
+                err -> {
+                    stateLabel.setText("上传失败：" + err.getMessage());
+                });
+    }
+
+    private static String getExt(String name) {
+        int dot = name.lastIndexOf('.');
+        String ext = dot >= 0 ? name.substring(dot + 1).toLowerCase() : "png";
+        if ("jpg".equals(ext)) ext = "jpeg";
+        return ext;
     }
 }

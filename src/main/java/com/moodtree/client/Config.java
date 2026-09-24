@@ -99,4 +99,10 @@ public class Config {
         } catch (IOException ignored) {
         }
     }
+
+    // ---- phix 会话标记（首启引导流程 §7） ----
+
+    /** 首启引导是否已完成（询问→登录/注册/跳过 后置 true，之后不再弹出） */
+    public boolean phixSessionDone() { return "1".equals(props.getProperty("phixSessionDone", "")); }
+    public void setPhixSessionDone(boolean done) { props.setProperty("phixSessionDone", done ? "1" : ""); }
 }

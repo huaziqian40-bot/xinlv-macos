@@ -1,0 +1,8 @@
+Add phix first-run onboarding (CONTRACT §7)
+
+首启引导：先向 phix 账号服务询问/登录/注册，完成后才进入正常流程。
+
+- AppContext/Config/Main：三处串起首启流程（phixSessionDone 标记，只问一次）
+- ApiClient：phixLogin（v2 账号发 auth_hash，v1 老账号发 password 兼容）、
+  phixRegister（显式 v1 scrypt-n15-r8-p1）、phixVerifyManifest 连通性验证
+- ui/MeView：引导界面；PhixCrypto 派生 authHash

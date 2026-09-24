@@ -182,4 +182,87 @@ public class ApiClient {
     public JsonObject profile() throws ApiException {
         return get("/api/v1/profile/", null, true);
     }
+
+    // ---- phix 会话凭据（§7 首启引导） ----
+
+    /** phix 登录：先取密钥材料；v2 账号发 auth_hash（服务端只存 AuthHash），v1 老账号发 password。 */
+    public JsonObject phixLogin(String server, String username, String password) throws ApiException {
+        JsonObject kmBody = new JsonObject();
+        kmBody.addProperty("username", username);
+        JsonObject km = postTo(server, "/api/v1/auth/keymaterial", kmBody);
+        String algo = km.has("kdf_algo") ? km.get("kdf_algo").getAsString() : "";
+        String salt = km.has("auth_salt") ? km.get("auth_salt").getAsString() : "";
+
+        JsonObject body = new JsonObject();
+        body.addProperty("username", username);
+        if ("scrypt-hkdf-v2".equals(algo) && salt != null && !salt.isEmpty()) {
+            // v2 账号：服务器只存 AuthHash（HKDF(scrypt(P,auth_salt))），绝不能发口令原文
+            body.addProperty("auth_hash", PhixCrypto.authHashHex(password, salt));
+        } else {
+            body.addProperty("password", password);   // v1 老账号兼容路径
+        }
+        return postTo(server, "/api/v1/auth/login", body);
+    }
+
+    /** phix 注册：显式选 v1，待客户端具备完整密钥管理后升级 v2 */
+    public JsonObject phixRegister(String server, String username, String password) throws ApiException {
+        JsonObject body = new JsonObject();
+        body.addProperty("username", username);
+        body.addProperty("password", password);
+        body.addProperty("agree", true);
+        // 显式选 v1（scrypt-n15-r8-p1）：不带 auth_salt / auth_hash；
+        // 待客户端具备完整密钥管理后升级 v2
+        body.addProperty("kdf_algo", "scrypt-n15-r8-p1");
+        return postTo(server, "/api/v1/auth/register", body);
+    }
+
+    private JsonObject postTo(String server, String path, JsonObject body) throws ApiException {
+        HttpRequest r = HttpRequest.newBuilder(URI.create(server + path))
+                .timeout(Duration.ofSeconds(15))
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8))
+                .build();
+        return send(r);
+    }
+
+    /** phix 连通性验证：GET /api/v1/sync/manifest */
+    public JsonObject phixVerifyManifest(String server, String token) throws ApiException {
+        HttpRequest r = HttpRequest.newBuilder(URI.create(server + "/api/v1/sync/manifest"))
+                .timeout(Duration.ofSeconds(15))
+                .header("Accept", "application/json")
+                .header("Authorization", "Bearer " + token)
+                .GET().build();
+        return send(r);
+    }
+
+    // ---- profile.pub 头像（§4 新增对象，免解密封装） ----
+
+    /** 读取 profile.pub（明文展示对象）：GET /api/v1/sync/objects/profile.pub */
+    public JsonObject getProfilePub(String server, String token) throws ApiException {
+        HttpRequest r = req("/api/v1/sync/objects/profile.pub", null, false)
+                .header("Authorization", "Bearer " + token)
+                .GET().build();
+        try {
+            return send(r);
+        } catch (ApiException e) {
+            if (e.status == 404) return null;   // 还没有 profile.pub，非错误
+            throw e;
+        }
+    }
+
+    /** 上传 profile.pub（明文展示对象）：POST /api/v1/sync/objects/profile.pub */
+    public JsonObject postProfilePub(String server, String token, JsonObject payload, int baseRevision) throws ApiException {
+        JsonObject envelope = new JsonObject();
+        envelope.add("payload", payload);
+        envelope.addProperty("base_revision", baseRevision);
+        HttpRequest r = HttpRequest.newBuilder(URI.create(server + "/api/v1/sync/objects/profile.pub"))
+                .timeout(Duration.ofSeconds(15))
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .header("Authorization", "Bearer " + token)
+                .POST(HttpRequest.BodyPublishers.ofString(envelope.toString(), StandardCharsets.UTF_8))
+                .build();
+        return send(r);
+    }
 }
