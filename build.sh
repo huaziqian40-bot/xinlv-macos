@@ -129,6 +129,28 @@ jpackage \
 
 echo -e "\n${GREEN}✓ 构建完成！${NC}"
 echo -e "DMG 文件：${GREEN}$(ls target/dist/*.dmg)${NC}"
+
+# ---- 步骤 4：从 DMG 里取出 .app，打成 zip（应用内自动更新载荷）----
+# 未签名的 .app 也能被客户端"下载 → 解压 → 替换自身"，用户只需右键打开一次。
+# 不改变 jpackage 的 dmg 配置：挂载 → ditto 打包 → 卸载。
+echo -e "\n${YELLOW}[4/4] 生成自更新 ZIP（供客户端自动下载替换）...${NC}"
+DMG_PATH=$(ls target/dist/*.dmg | head -1)
+ZIP_NAME="XinLv-mac-${APP_VERSION}.zip"
+MOUNT_POINT="/tmp/xinlv_dmg_mnt"
+rm -rf "$MOUNT_POINT"
+if hdiutil attach "$DMG_PATH" -nobrowse -quiet -mountpoint "$MOUNT_POINT"; then
+    if [ -d "$MOUNT_POINT/心履.app" ]; then
+        rm -f "target/dist/$ZIP_NAME"
+        ditto -c -k --sequesterRsrc --keepParent "$MOUNT_POINT/心履.app" "target/dist/$ZIP_NAME" \
+            && echo -e "  ${GREEN}✓ 自更新包：target/dist/$ZIP_NAME${NC}"
+    else
+        echo -e "  ${RED}✗ DMG 里没找到 心履.app${NC}"
+    fi
+    hdiutil detach "$MOUNT_POINT" -quiet || true
+else
+    echo -e "  ${RED}✗ 挂载 DMG 失败，跳过自更新包${NC}"
+fi
+
 echo -e "\n首个 DMG 文件大小："
 ls -lh target/dist/*.dmg
 
