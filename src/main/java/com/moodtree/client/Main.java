@@ -49,6 +49,11 @@ public class Main extends Application {
             app.showLogin();
         }
         stage.show();
+
+        // 应用内自动更新：macOS 未签名走"检测→通知→打开下载页"半自动方案
+        try {
+            com.moodtree.client.updater.UpdaterMac.checkAsync();
+        } catch (Throwable ignored) { }
     }
 
     public static void main(String[] args) {
