@@ -1,12 +1,13 @@
-/* 心履 macOS 应用内自动更新（未签名，自助替换）。
+/* 心履 macOS 应用内更新（未签名，自助替换，卡片确认制）。
  *
  * 流程：
- *   1. GET /api/v1/update/check?product=xinlv&platform=mac 拿到新版本 .zip（内含 .app）与 sha256
- *   2. 下载 → SHA256 校验 → 用 ditto 解压到 ~/.moodtree/.update-staging/
- *   3. 写一个脱离主进程的 bash 脚本：
+ *   1. 启动时后台 GET /api/v1/update/check?product=xinlv&platform=mac，仅拉清单判断是否有新版
+ *   2. 有新版则弹「确认卡片」：用户点「更新」才进入下方下载/替换流程，「取消/跳过」不做任何下载
+ *   3. 下载 → SHA256 校验 → 用 ditto 解压到 ~/.moodtree/.update-staging/
+ *   4. 写一个脱离主进程的 bash 脚本：
  *        等本进程退出 → 旧 .app 移进废纸篓 → 新 .app 就位 →
  *        xattr 清 com.apple.quarantine → codesign ad-hoc 重签 → open 重启
- *   4. 主进程退出，脚本接管
+ *   5. 主进程退出，脚本接管
  *
  * **用户只需要在新版本首次启动时右键 →「打开」一次**（未签名应用的 Gatekeeper 限制），
  * 不需要自己下载。自动替换准备失败时才降级为打开官网下载页。
@@ -14,6 +15,9 @@
  * 注：dmg 无法直接用于自动替换（要挂载），所以服务端为 macOS 提供的是 .app 的 zip。
  */
 package com.moodtree.client.updater;
+
+import com.moodtree.client.Config;
+import javafx.application.Platform;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,12 +33,13 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.FutureTask;
 import java.util.stream.Stream;
 
 public class UpdaterMac {
 
     /** 与 pom.xml <version> 保持同步 */
-    public static final String APP_VERSION = "1.1.7";
+    public static final String APP_VERSION = "1.1.8";
 
     private static final String CHECK_URL =
             "https://phix.ing/api/v1/update/check?product=xinlv&platform=mac";
@@ -43,12 +48,24 @@ public class UpdaterMac {
 
     private UpdaterMac() { }
 
-    /** 后台检查；有新版则自动下载并准备替换。 */
+    /** 后台检查；有新版则弹「确认卡片」，不自动下载。用户点「更新」才下载并准备替换。 */
     public static void checkAsync() {
         Thread t = new Thread(() -> {
             try {
                 Entry e = check();
-                if (e == null) return;
+                if (e == null) return;   // 只检查，绝不自动下载
+                // 跳到 FX 线程弹卡片
+                FutureTask<UpdateCard.Choice> card = new FutureTask<>(() ->
+                        UpdateCard.showAndWait(e.version, APP_VERSION, e.releaseNotes));
+                Platform.runLater(card);
+                UpdateCard.Choice c = card.get();
+                if (c == UpdateCard.Choice.SKIP) {
+                    Config cfg = new Config();
+                    cfg.setSkippedUpdateVersion(e.version);
+                    cfg.save();
+                    return;
+                }
+                if (c != UpdateCard.Choice.UPDATE) return;   // 取消：不动
                 if (stage(e)) {
                     // 替换脚本已接管：给它一点时间写盘，然后退出当前实例
                     Thread.sleep(1500);
@@ -57,7 +74,7 @@ public class UpdaterMac {
                     fallback();
                 }
             } catch (Throwable ignored) { }
-        }, "xinlv-mac-auto-updater");
+        }, "xinlv-mac-updater-check");
         t.setDaemon(true);
         t.start();
     }
@@ -66,6 +83,7 @@ public class UpdaterMac {
         String version;
         String url;
         String sha256;
+        String releaseNotes;
     }
 
     private static Entry check() throws Exception {
@@ -84,7 +102,10 @@ public class UpdaterMac {
         e.version = jsonString(body, "latest_version");
         e.url = jsonString(body, "url");
         e.sha256 = jsonString(body, "sha256");
+        e.releaseNotes = jsonString(body, "release_notes");
         if (e.version.isEmpty() || e.version.equals(APP_VERSION)) return null;
+        // 用户曾「跳过本版本」：该版本不再提示（更高的新版本仍会提示）
+        if (e.version.equals(new Config().skippedUpdateVersion())) return null;
         if (!e.url.endsWith(".zip") || e.sha256.isEmpty()) return null;
         return e;
     }
@@ -259,15 +280,56 @@ public class UpdaterMac {
         return "'" + s.replace("'", "'\\''") + "'";
     }
 
+    /**
+     * 简单 JSON 字段提取（项目未引入 JSON 库时用最小实现；值必须是字符串）。
+     * 正确处理反斜杠转义（引号、反斜杠、换行、Unicode 十六进制序列），
+     * 避免被「更新内容里的引号」提前截断。
+     */
     private static String jsonString(String json, String key) {
-        int i = json.indexOf("\"" + key + "\"");
+        String needle = "\"" + key + "\"";
+        int i = json.indexOf(needle);
         if (i < 0) return "";
-        i = json.indexOf(':', i + key.length() + 2);
+        i = json.indexOf(':', i + needle.length());
         if (i < 0) return "";
-        i = json.indexOf('"', i);
-        if (i < 0) return "";
-        int j = json.indexOf('"', i + 1);
-        if (j < 0) return "";
-        return json.substring(i + 1, j);
+        i++;
+        while (i < json.length() && Character.isWhitespace(json.charAt(i))) i++;
+        if (i >= json.length() || json.charAt(i) != '"') return "";
+        i++; // 跳过开头的引号
+        StringBuilder sb = new StringBuilder();
+        while (i < json.length()) {
+            char c = json.charAt(i);
+            if (c == '\\') {
+                i++;
+                if (i >= json.length()) break;
+                char esc = json.charAt(i);
+                switch (esc) {
+                    case 'n': sb.append('\n'); break;
+                    case 'r': sb.append('\r'); break;
+                    case 't': sb.append('\t'); break;
+                    case 'b': sb.append('\b'); break;
+                    case 'f': sb.append('\f'); break;
+                    case '"': sb.append('"'); break;
+                    case '\\': sb.append('\\'); break;
+                    case '/': sb.append('/'); break;
+                    case 'u': {
+                        if (i + 4 < json.length()) {
+                            try {
+                                sb.append((char) Integer.parseInt(json.substring(i + 1, i + 5), 16));
+                                i += 4;
+                            } catch (Exception ignored) { /* 非法转义序列保持原样 */ }
+                        }
+                        break;
+                    }
+                    default: sb.append(esc); break;
+                }
+                i++;
+            } else if (c == '"') {
+                return sb.toString();
+            } else {
+                sb.append(c);
+                i++;
+            }
+        }
+        return sb.toString();
     }
 }

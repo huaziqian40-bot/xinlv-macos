@@ -50,7 +50,8 @@ public class Main extends Application {
         }
         stage.show();
 
-        // 应用内自动更新：macOS 未签名走"检测→通知→打开下载页"半自动方案
+        // 应用内更新：后台只检查，发现新版本弹「确认卡片」（取消 / 跳过本版本 / 更新）。
+        // 用户点「更新」之前不会下载任何东西；macOS 未签名，点更新后由软件自己下载替换。
         try {
             com.moodtree.client.updater.UpdaterMac.checkAsync();
         } catch (Throwable ignored) { }

@@ -105,4 +105,8 @@ public class Config {
     /** 首启引导是否已完成（询问→登录/注册/跳过 后置 true，之后不再弹出） */
     public boolean phixSessionDone() { return "1".equals(props.getProperty("phixSessionDone", "")); }
     public void setPhixSessionDone(boolean done) { props.setProperty("phixSessionDone", done ? "1" : ""); }
+
+    /** 用户点「跳过本版本」时记录的版本号：该版本不再提示；更高的新版本仍要提示。空=未跳过 */
+    public String skippedUpdateVersion() { return props.getProperty("skippedUpdateVersion", ""); }
+    public void setSkippedUpdateVersion(String v) { props.setProperty("skippedUpdateVersion", v == null ? "" : v.trim()); }
 }
