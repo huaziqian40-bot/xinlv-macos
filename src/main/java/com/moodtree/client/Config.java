@@ -106,6 +106,18 @@ public class Config {
     public boolean phixSessionDone() { return "1".equals(props.getProperty("phixSessionDone", "")); }
     public void setPhixSessionDone(boolean done) { props.setProperty("phixSessionDone", done ? "1" : ""); }
 
+    /** phix 统一账号所在服务器（origin，不含 /api/v1）。
+     *
+     *  **和 `serverBase` 是两回事**：`serverBase` 是心履自己的服务器（xin-lv.com），
+     *  这个记的是 phix 账号服务器。以前把 phix 地址写进 `serverBase`，
+     *  登录一次 phix 就会把心履的服务器地址覆盖掉 —— 那是个 bug，这里分开存。
+     *
+     *  地址由 `PhixServers` 自动挑（界面不给用户看），这里只是把挑中的记住。 */
+    public String phixServer() { return props.getProperty("phixServer", "").trim(); }
+    public void setPhixServer(String s) {
+        props.setProperty("phixServer", s == null ? "" : s.trim());
+    }
+
     /** 用户点「跳过本版本」时记录的版本号：该版本不再提示；更高的新版本仍要提示。空=未跳过 */
     public String skippedUpdateVersion() { return props.getProperty("skippedUpdateVersion", ""); }
     public void setSkippedUpdateVersion(String v) { props.setProperty("skippedUpdateVersion", v == null ? "" : v.trim()); }

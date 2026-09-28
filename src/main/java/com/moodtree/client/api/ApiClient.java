@@ -226,6 +226,16 @@ public class ApiClient {
         return send(r);
     }
 
+    /** phix 连通性探测（免鉴权、只读）：GET /api/v1/ping。
+     *  用来在不让用户填服务器地址的前提下，自己挑一台能连上的（见 PhixServers）。 */
+    public JsonObject phixPing(String server) throws ApiException {
+        HttpRequest r = HttpRequest.newBuilder(URI.create(server + "/api/v1/ping"))
+                .timeout(Duration.ofSeconds(6))
+                .header("Accept", "application/json")
+                .GET().build();
+        return send(r);
+    }
+
     /** phix 连通性验证：GET /api/v1/sync/manifest */
     public JsonObject phixVerifyManifest(String server, String token) throws ApiException {
         HttpRequest r = HttpRequest.newBuilder(URI.create(server + "/api/v1/sync/manifest"))

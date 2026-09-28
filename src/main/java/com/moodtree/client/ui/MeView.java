@@ -307,7 +307,11 @@ public class MeView extends VBox implements Refreshable {
         return initial;
     }
 
-    /** 设置区：主题（预设 + 3 色自定义）/ 服务器地址 / 刷新推荐目录 */
+    /** 设置区：主题（预设 + 3 色自定义）/ 刷新推荐目录。
+     *
+     *  **不展示服务器地址**（用户 2026-09-28 要求：服务器地址是技术细节，不该让用户看到）。
+     *  地址仍由 `Config.serverBase()` 决定（可用 MOODTREE_SERVER 环境变量或配置文件改），
+     *  只是界面上不再出现输入框。 */
     private VBox buildSettings() {
         Label h = new Label("设置");
         h.setStyle(Theme.h2());
@@ -315,24 +319,6 @@ public class MeView extends VBox implements Refreshable {
         // ---- 主题卡片：预设 + 3 色编辑（与手机端一致）----
         VBox themeCard = buildThemeCard();
         VBox.setMargin(themeCard, new Insets(6, 0, 0, 0));
-
-        // ---- 服务器地址（技术细节藏在这里，登录页不显示）----
-        Label serverLabel = new Label("服务器地址");
-        serverLabel.setStyle(Theme.soft());
-        TextField server = new TextField(app.config.serverBase());
-        server.setStyle(Theme.input());
-        server.setMaxWidth(360);
-        Button saveServer = new Button("保存");
-        saveServer.setStyle(Theme.primaryBtn());
-        Label saveState = new Label();
-        saveState.setStyle(Theme.soft());
-        saveServer.setOnAction(e -> {
-            app.config.setServerBase(server.getText());
-            app.config.save();
-            saveState.setText("已保存，重启后完全生效");
-        });
-        HBox serverRow = new HBox(10, server, saveServer, saveState);
-        serverRow.setAlignment(Pos.CENTER_LEFT);
 
         Button refreshCatalog = new Button("刷新推荐内容缓存");
         refreshCatalog.setStyle(Theme.ghostBtn() + "-fx-border-color: " + Theme.ACCENT
@@ -355,8 +341,7 @@ public class MeView extends VBox implements Refreshable {
         HBox catRow = new HBox(10, refreshCatalog, catState);
         catRow.setAlignment(Pos.CENTER_LEFT);
 
-        VBox box = new VBox(10, h, themeCard,
-                serverLabel, serverRow, catRow);
+        VBox box = new VBox(10, h, themeCard, catRow);
         box.setPadding(new Insets(16));
         box.setStyle(Theme.card());
         VBox.setMargin(box, new Insets(10, 0, 0, 0));

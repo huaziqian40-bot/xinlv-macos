@@ -66,17 +66,35 @@ public class PhixSessionView extends VBox {
 
     // ---- phix 登录页 ----
 
+    /**
+     * 挑一台能连上的 phix 服务器。**界面不问用户**（用户 2026-09-28 要求不展示服务器地址）。
+     *
+     * 顺序：上次记住的 → 候选列表（内网自建（部署者用 PHIX_LAN_SERVER / .phix-local.json
+     * 指定）→ 公网 phix.ing）。都不通时返回首选地址，让登录把真实错误
+     * （连不上 / 账号密码不对）说出来，而不是卡在"先填地址"。
+     */
+    private String resolvePhixServer() {
+        String remembered = app.config.phixServer();
+        if (!remembered.isEmpty()) return remembered;
+        for (String candidate : com.moodtree.client.api.PhixServers.candidates()) {
+            try {
+                app.api.phixPing(candidate);
+                return candidate;
+            } catch (Exception ignored) { /* 换下一个候选 */ }
+        }
+        return com.moodtree.client.api.PhixServers.defaultServer();
+    }
+
     private void showPhixLogin() {
         getChildren().clear();
 
         Label title = new Label("phix 登录");
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: " + Theme.INK + ";");
 
-        Label serverLbl = new Label("服务器地址");
-        serverLbl.setStyle(Theme.soft());
-        TextField server = new TextField("http://192.168.5.41:8931");
-        server.setStyle(Theme.input());
-        server.setMaxWidth(360);
+        Label hint = new Label("用你的 phix 账号登录，记录可跨设备同步。");
+        hint.setStyle(Theme.soft());
+        hint.setWrapText(true);
+        hint.setMaxWidth(360);
 
         TextField username = new TextField();
         username.setPromptText("账号");
@@ -107,21 +125,22 @@ public class PhixSessionView extends VBox {
         skipLink.setOnAction(e -> finishGuide());
 
         submit.setOnAction(e -> {
-            String srv = server.getText().trim();
             String user = username.getText().trim();
             String pass = password.getText();
-            if (srv.isEmpty() || user.isEmpty() || pass.isEmpty()) {
-                status.setText("请填写完整信息");
+            if (user.isEmpty() || pass.isEmpty()) {
+                status.setText("请填写账号和密码");
                 return;
             }
             submit.setDisable(true);
             status.setText("正在登录…");
             Bg.run(() -> {
+                        String srv = resolvePhixServer();
                         JsonObject r = app.api.phixLogin(srv, user, pass);
                         String tok = r.has("token") ? r.get("token").getAsString() : "";
                         app.config.setToken(tok);
                         app.config.setUsername(user);
-                        app.config.setServerBase(srv);
+                        // 分别记：serverBase 是心履自己的服务器，phixServer 是 phix 的
+                        app.config.setPhixServer(srv);
                         app.config.setGuestMode(false);
                         app.config.save();
                         // 验证连通
@@ -144,7 +163,7 @@ public class PhixSessionView extends VBox {
         Region gap = new Region();
         gap.setPrefHeight(4);
 
-        getChildren().addAll(title, serverLbl, server, username, password,
+        getChildren().addAll(title, hint, username, password,
                 submit, status, back, gap, skipLink);
     }
 
@@ -156,11 +175,10 @@ public class PhixSessionView extends VBox {
         Label title = new Label("phix 注册");
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: " + Theme.INK + ";");
 
-        Label serverLbl = new Label("服务器地址");
-        serverLbl.setStyle(Theme.soft());
-        TextField server = new TextField("http://192.168.5.41:8931");
-        server.setStyle(Theme.input());
-        server.setMaxWidth(360);
+        Label hint = new Label("注册一个 phix 账号，记录可跨设备同步。");
+        hint.setStyle(Theme.soft());
+        hint.setWrapText(true);
+        hint.setMaxWidth(360);
 
         TextField username = new TextField();
         username.setPromptText("账号");
@@ -196,12 +214,11 @@ public class PhixSessionView extends VBox {
         skipLink.setOnAction(e -> finishGuide());
 
         submit.setOnAction(e -> {
-            String srv = server.getText().trim();
             String user = username.getText().trim();
             String pass = password.getText();
             String pass2 = password2.getText();
-            if (srv.isEmpty() || user.isEmpty() || pass.isEmpty()) {
-                status.setText("请填写完整信息");
+            if (user.isEmpty() || pass.isEmpty()) {
+                status.setText("请填写账号和密码");
                 return;
             }
             if (!pass.equals(pass2)) {
@@ -211,11 +228,13 @@ public class PhixSessionView extends VBox {
             submit.setDisable(true);
             status.setText("正在注册…");
             Bg.run(() -> {
+                        String srv = resolvePhixServer();
                         JsonObject r = app.api.phixRegister(srv, user, pass);
                         String tok = r.has("token") ? r.get("token").getAsString() : "";
                         app.config.setToken(tok);
                         app.config.setUsername(user);
-                        app.config.setServerBase(srv);
+                        // 分别记：serverBase 是心履自己的服务器，phixServer 是 phix 的
+                        app.config.setPhixServer(srv);
                         app.config.setGuestMode(false);
                         app.config.save();
                         // 验证连通
@@ -238,7 +257,7 @@ public class PhixSessionView extends VBox {
         Region gap = new Region();
         gap.setPrefHeight(4);
 
-        getChildren().addAll(title, serverLbl, server, username, password, password2,
+        getChildren().addAll(title, hint, username, password, password2,
                 submit, status, back, gap, skipLink);
     }
 
