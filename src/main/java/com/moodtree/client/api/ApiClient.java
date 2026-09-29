@@ -137,6 +137,20 @@ public class ApiClient {
         return post("/api/v1/sync/push/", entriesJson, true);
     }
 
+    /** 长轮询挂起等云端变化（/api/v1/sync/watch/）。since 是上次 watch 返回的不透明游标，
+     *  客户端原样回传即可（空/null = 从当前状态开始挂）。
+     *  服务端最多挂约 25 秒，之后回 {changed:false}；客户端超时给 35 秒，
+     *  **必须比服务端挂起时间长** —— 否则会在服务端刚要返回时被本地掐断，
+     *  变成一连串无意义的失败重连。服务端太忙时会立刻回 changed=false 并带
+     *  retry_after（秒），那不是超时，调用方要按它让的间隔再挂，绝不能热循环。 */
+    public JsonObject watchEntries(String since) throws ApiException {
+        HttpRequest r = req("/api/v1/sync/watch/",
+                since == null || since.isEmpty() ? null : Map.of("since", since), true)
+                .timeout(Duration.ofSeconds(35))
+                .GET().build();
+        return send(r);
+    }
+
     /** 在线小游戏物理参数（免认证）；网络失败抛 ApiException，调用方保留本地默认值。 */
     public JsonObject gameConfig() throws ApiException {
         return get("/api/game-config/", null, false);

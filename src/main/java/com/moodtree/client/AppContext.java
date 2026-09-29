@@ -92,8 +92,9 @@ public class AppContext {
         if (canEnterMain()) showMain();
     }
 
-    /** 退出登录：通知服务端注销令牌（失败也继续），清空本地凭据与游客标记 */
+    /** 退出登录：通知服务端注销令牌（失败也继续），停掉云变更长轮询，清空本地凭据与游客标记 */
     public void logout() {
+        sync.stopWatch();   // 没令牌了，别再挂 /watch
         try { api.logout(); } catch (Exception ignored) { }
         config.setToken("");
         config.setUsername("");
@@ -103,6 +104,7 @@ public class AppContext {
     }
 
     public void close() {
+        sync.stopWatch();   // 关窗前收尾，别让挂起的后台线程拖住退出
         db.close();
     }
 }

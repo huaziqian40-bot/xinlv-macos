@@ -294,6 +294,8 @@ public class MainShell extends BorderPane {
             show(app.lastViewKey());
         }
         updateMoodVisual();
+        // 已登录就拉起云变更长轮询：手机/网页端一改，这里几个 RTT 内就能同步（幂等，重复无副作用）
+        if (app.loggedIn()) app.sync.startWatch();
         syncNow();
     }
 
@@ -312,7 +314,10 @@ public class MainShell extends BorderPane {
                     if (r.error != null) {
                         syncStatus.setText((r.offline ? "离线，数据已存本地 " : r.error + " ") + time);
                     } else {
-                        syncStatus.setText(r.summary() + "  " + time);
+                        // watchDiag() 没内容时不留下多余的双空格
+                        String diag = watchDiag();
+                        syncStatus.setText(r.summary() + "  " + time
+                                + (diag.isEmpty() ? "" : "  " + diag));
                     }
                     updateMoodVisual();
                     javafx.scene.Node v = views.get(currentKey);
@@ -322,6 +327,19 @@ public class MainShell extends BorderPane {
                     syncing = false;
                     syncStatus.setText("同步失败：" + err.getMessage());
                 });
+    }
+
+    /**
+     * 实时同步那一小句 —— **只说"在不在实时同步"**，别的一个字都不上界面。
+     *
+     * 用户 2026-09-28 明确要求过客户端不要展示技术细节（当时点名的是服务器地址）。
+     * 这一行是侧栏里**一直挂着**的状态文字，所以尤其不能往里塞内部东西：
+     * 游标是不透明串（形如 `3:2026-09-29T13:40:2…`），用户既看不懂又占地方，
+     * 截断之后更像坏掉了。真排障时用 `sync.watchCursor()` / `lastWatchHitAt()` 取。
+     */
+    private String watchDiag() {
+        if (!app.loggedIn() || !app.sync.isWatching()) return "";
+        return "· 实时同步";
     }
 
     // ============ 情绪视觉影响 ============
