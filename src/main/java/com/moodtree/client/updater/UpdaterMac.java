@@ -39,7 +39,7 @@ import java.util.stream.Stream;
 public class UpdaterMac {
 
     /** 与 pom.xml <version> 保持同步 */
-    public static final String APP_VERSION = "1.1.8";
+    public static final String APP_VERSION = "1.1.9";
 
     private static final String CHECK_URL =
             "https://phix.ing/api/v1/update/check?product=xinlv&platform=mac";
