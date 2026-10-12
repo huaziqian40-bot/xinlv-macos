@@ -6,6 +6,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.moodtree.client.AppContext;
+import com.moodtree.client.about.About;
 import javafx.animation.FadeTransition;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
@@ -17,7 +18,6 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -341,11 +341,92 @@ public class MeView extends VBox implements Refreshable {
         HBox catRow = new HBox(10, refreshCatalog, catState);
         catRow.setAlignment(Pos.CENTER_LEFT);
 
-        VBox box = new VBox(10, h, themeCard, catRow);
+        VBox box = new VBox(10, h, themeCard, catRow, buildAboutCard());
         box.setPadding(new Insets(16));
         box.setStyle(Theme.card());
         VBox.setMargin(box, new Insets(10, 0, 0, 0));
         return box;
+    }
+
+    /** 「关于软件」卡片：当前版本 / 检查更新 / 作者信息 / 访问官网。
+     *
+     *  **不展示任何技术细节**（用户 2026-09-28 要求过：服务器地址等内部信息
+     *  不该让用户看到）——这里只有作者、版本和官网，没有任何地址/密钥类内容。
+     *  版本号从 Updater 的唯一常量读取（发布时随 pom 一起改），界面绝不写死。 */
+    private VBox buildAboutCard() {
+        Label ah = new Label("关于软件");
+        ah.setStyle(Theme.h2());
+
+        // 1) 当前版本：来自单一起源 About.version()（= 平台 Updater.APP_VERSION）
+        Label version = new Label("当前版本 v" + About.version());
+        version.setStyle(Theme.soft());
+
+        // 2) 检查更新：手动检查必须**始终**给出结果，且绝不把「检查失败」当「已是最新」
+        Button checkBtn = new Button("检查更新");
+        checkBtn.setStyle(Theme.ghostBtn() + "-fx-border-color: " + Theme.ACCENT
+                + "; -fx-border-radius: 8; -fx-text-fill: " + Theme.ACCENT_D + ";");
+        Label checkState = new Label();
+        checkState.setStyle(Theme.soft());
+        checkState.setWrapText(true);
+        checkBtn.setOnAction(e -> {
+            // 检查期间禁用，避免连点
+            checkBtn.setDisable(true);
+            checkState.setText("检查中…");
+            // Bg 把网络检查放到后台线程，绝不堵 JavaFX 界面线程；回调切回界面线程
+            Bg.run(About::check,
+                    r -> {
+                        checkBtn.setDisable(false);
+                        checkState.setText(About.messageFor(r, About.newVersion()));
+                        // 发现新版本：由既有更新流程弹「确认卡片」，走更新/跳过
+                        if (About.isUpdateAvailable(r)) {
+                            About.runUpdateFlow();
+                        }
+                    },
+                    err -> {
+                        // 任何异常都不让出 handler，且明确报「检查失败」，不是"已是最新"
+                        checkBtn.setDisable(false);
+                        checkState.setText("检查失败，请稍后再试");
+                    });
+        });
+        HBox checkRow = new HBox(10, checkBtn, checkState);
+        checkRow.setAlignment(Pos.CENTER_LEFT);
+
+        // 3) 作者信息：与官网页脚一致
+        Label org = new Label("上海民办平和学校 · 维修社 · 用代码装点校园生活");
+        org.setStyle(Theme.soft());
+        org.setWrapText(true);
+        Label emails = new Label("📧 norine.liu@icloud.com / huaziqian40@gmail.com");
+        emails.setStyle(Theme.soft());
+        Label phones = new Label("📞 18901712280 / 13675821816");
+        phones.setStyle(Theme.soft());
+        Label wechat = new Label("💬 微信：Norine2010 / int_32_2147483647");
+        wechat.setStyle(Theme.soft());
+        // B 站主页：可点击，用系统默认浏览器打开
+        Button bili = new Button("📺 B站主页");
+        bili.setStyle(Theme.ghostBtn() + "-fx-text-fill: " + Theme.ACCENT_D + "; -fx-underline: true;");
+        bili.setOnAction(ev -> openBrowser("https://space.bilibili.com/1121702307"));
+        Label copy = new Label("© 2026 phix");
+        copy.setStyle(Theme.soft());
+
+        // 4) 访问官网：系统默认浏览器打开下载页
+        Button siteBtn = new Button("访问官网");
+        siteBtn.setStyle(Theme.ghostBtn() + "-fx-border-color: " + Theme.ACCENT
+                + "; -fx-border-radius: 8; -fx-text-fill: " + Theme.ACCENT_D + ";");
+        siteBtn.setOnAction(ev -> openBrowser("https://phix.ing/download/"));
+
+        VBox card = new VBox(8, ah, version, checkRow,
+                org, emails, phones, wechat, bili, copy, siteBtn);
+        VBox.setMargin(card, new Insets(6, 0, 0, 0));
+        return card;
+    }
+
+    /** 用系统默认浏览器打开外部链接（与登录页免责声明/推荐页一致的既有做法）。 */
+    private void openBrowser(String url) {
+        try {
+            java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
+        } catch (Exception e) {
+            stateLabel.setText("打不开浏览器，请手动访问：" + url);
+        }
     }
 
     // ========== 主题专用卡片（3 色编辑，与手机端一致） ==========

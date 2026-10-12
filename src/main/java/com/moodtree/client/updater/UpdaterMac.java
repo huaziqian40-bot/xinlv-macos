@@ -34,12 +34,13 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 public class UpdaterMac {
 
     /** 与 pom.xml <version> 保持同步 */
-    public static final String APP_VERSION = "1.1.9";
+    public static final String APP_VERSION = "1.1.10";
 
     private static final String CHECK_URL =
             "https://phix.ing/api/v1/update/check?product=xinlv&platform=mac";
@@ -50,6 +51,7 @@ public class UpdaterMac {
 
     /** 后台检查；有新版则弹「确认卡片」，不自动下载。用户点「更新」才下载并准备替换。 */
     public static void checkAsync() {
+        if (!CARD_IN_FLIGHT.compareAndSet(false, true)) return; // 已有卡片在弹（如手动检查），别再叠一个
         Thread t = new Thread(() -> {
             try {
                 Entry e = check();
@@ -74,6 +76,7 @@ public class UpdaterMac {
                     fallback();
                 }
             } catch (Throwable ignored) { }
+            finally { CARD_IN_FLIGHT.set(false); }
         }, "xinlv-mac-updater-check");
         t.setDaemon(true);
         t.start();
@@ -108,6 +111,122 @@ public class UpdaterMac {
         if (e.version.equals(new Config().skippedUpdateVersion())) return null;
         if (!e.url.endsWith(".zip") || e.sha256.isEmpty()) return null;
         return e;
+    }
+
+    // ---------- 「关于软件」手动检查更新 ----------
+    //
+    // 启动检查把"没有新版本"和"检查失败"都压成 null，静默处理没问题；
+    // 但手动检查必须把这两种**相反**的状态分开，否则断网会误显示成
+    // 「已是最新版本」（用户最讨厌的经典 bug）。
+    // 所以手动检查返回三态：已是最新 / 发现新版本 / 检查失败。
+
+    /** 手动检查更新的三种结果。 */
+    public enum UpdateCheckResult { UP_TO_DATE, NEW_VERSION, FAILED }
+
+    // 防止「启动检查」和「手动检查」同时弹卡（叠出两个对话框）
+    private static final AtomicBoolean CARD_IN_FLIGHT = new AtomicBoolean(false);
+
+    // 手动检查暂存的待更新信息（供下方卡片/替换流程用，免得把 check() 的静默语义搬过来）
+    private static volatile Entry manualEntry;
+
+    /**
+     * 纯分类逻辑：根据已拉取的清单字段判断检查结果。
+     * 不碰网络（测试也走这里，用桩数据驱动）：
+     *   - 拿不到版本号、或缺 .zip 更新包必备字段 → FAILED（坏响应，绝不当"已是最新"）；
+     *   - 版本相同、或用户已「跳过本版本」→ UP_TO_DATE；
+     *   - 其余 → NEW_VERSION。
+     */
+    public static UpdateCheckResult classify(String latest, String url, String sha) {
+        return classify(latest, url, sha, new Config());
+    }
+
+    /** 可注入 Config 的纯分类（带 Config 版本给测试用，避免读真实用户配置）。 */
+    public static UpdateCheckResult classify(String latest, String url, String sha, Config cfg) {
+        if (latest == null || latest.isEmpty()) return UpdateCheckResult.FAILED;      // 坏响应：没有版本号
+        if (url == null || url.isEmpty() || !url.endsWith(".zip")) return UpdateCheckResult.FAILED; // 拿不到 .app 更新包
+        if (sha == null || sha.isEmpty()) return UpdateCheckResult.FAILED;
+        if (latest.equals(APP_VERSION)) return UpdateCheckResult.UP_TO_DATE;
+        if (latest.equals(cfg.skippedUpdateVersion())) return UpdateCheckResult.UP_TO_DATE; // 用户已跳过
+        return UpdateCheckResult.NEW_VERSION;
+    }
+
+    /** 手动「检查更新」：任何一步不对（断网/超时/非 200/坏响应）都判 FAILED，绝不吞成"已是最新"。 */
+    public static UpdateCheckResult manualCheck() {
+        try {
+            HttpClient http = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(6))
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .build();
+            HttpRequest req = HttpRequest.newBuilder(URI.create(CHECK_URL))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("User-Agent", USER_AGENT)
+                    .GET().build();
+            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() != 200) return UpdateCheckResult.FAILED;
+            String body = resp.body();
+            String latest = jsonString(body, "latest_version");
+            String url = jsonString(body, "url");
+            String sha = jsonString(body, "sha256");
+            UpdateCheckResult r = classify(latest, url, sha);
+            // 有新版本时暂存下载信息，供下方既有「确认卡片」流程使用
+            if (r == UpdateCheckResult.NEW_VERSION) {
+                Entry e = new Entry();
+                e.version = latest;
+                e.url = url;
+                e.sha256 = sha;
+                e.releaseNotes = jsonString(body, "release_notes");
+                manualEntry = e;
+            }
+            return r;
+        } catch (Exception e) {
+            return UpdateCheckResult.FAILED; // 断网/超时：明确报「检查失败」，不是"已是最新"
+        }
+    }
+
+    /** 手动检查暂存的新版本号（用于拼「发现新版本 vX」；无则空串）。 */
+    public static String newVersion() {
+        Entry e = manualEntry;
+        return e == null || e.version == null ? "" : e.version;
+    }
+
+    /** 检查结果 → 界面提示文案（纯映射，测试直接测）。 */
+    public static String messageFor(UpdateCheckResult r, String newVersion) {
+        return switch (r) {
+            case UP_TO_DATE -> "已是最新版本";
+            case NEW_VERSION -> "发现新版本 v" + (newVersion == null ? "" : newVersion);
+            case FAILED -> "检查失败，请稍后再试";
+        };
+    }
+
+    /**
+     * 手动检查发现新版本后，走既有「确认卡片」流程（不重复拉取，直接弹卡）。
+     * 在后台线程（Bg）调用；与启动卡片用 CARD_IN_FLIGHT 互斥，绝不叠两个对话框。
+     */
+    public static void runManualUpdateFlow() {
+        if (!CARD_IN_FLIGHT.compareAndSet(false, true)) return;
+        new Thread(() -> {
+            try {
+                Entry e = manualEntry;
+                if (e == null) return;   // 没有待更新信息
+                FutureTask<UpdateCard.Choice> card = new FutureTask<>(() ->
+                        UpdateCard.showAndWait(e.version, APP_VERSION, e.releaseNotes));
+                Platform.runLater(card);
+                UpdateCard.Choice c = card.get();
+                if (c == UpdateCard.Choice.SKIP) {
+                    Config cfg = new Config();
+                    cfg.setSkippedUpdateVersion(e.version);
+                    cfg.save();
+                } else if (c == UpdateCard.Choice.UPDATE) {
+                    if (stage(e)) {
+                        Thread.sleep(1500);
+                        System.exit(0);
+                    } else {
+                        fallback();
+                    }
+                }
+            } catch (Throwable ignored) { }
+            finally { CARD_IN_FLIGHT.set(false); }
+        }, "xinlv-mac-updater-manual").start();
     }
 
     /** 下载 → 校验 → 解压 → 写替换脚本并启动。成功返回 true（调用方应退出）。 */
